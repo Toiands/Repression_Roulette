@@ -3,6 +3,7 @@
 from __future__ import annotations
 
 import html
+from contextlib import contextmanager
 
 import streamlit as st
 
@@ -13,13 +14,36 @@ BG_IMAGE = (
     "?q=80&w=2070&auto=format&fit=crop"
 )
 
-# 玻璃卡片容器
+# 玻璃卡片容器（加宽、加大内边距）
 S_CARD = (
     "background:rgba(15,23,42,0.95);backdrop-filter:blur(24px);"
-    "border:1px solid rgba(255,255,255,0.08);border-top:1px solid rgba(255,255,255,0.1);"
-    "border-radius:1.5rem;box-shadow:0 25px 50px -12px rgba(0,0,0,0.8);"
-    "overflow:hidden;margin-bottom:1rem;"
+    "border:1px solid rgba(255,255,255,0.1);border-top:1px solid rgba(255,255,255,0.12);"
+    "border-radius:1.75rem;box-shadow:0 25px 50px -12px rgba(0,0,0,0.8);"
+    "overflow:hidden;margin-bottom:1.25rem;"
 )
+
+S_PAD_X = "1.75rem"
+S_PAD_BLOCK = "1.35rem 1.75rem"
+
+
+@contextmanager
+def game_layout():
+    """居中加宽主内容区（宽屏约 75% 宽度）。"""
+    _left, center, _right = st.columns([1, 7, 1])
+    with center:
+        yield
+
+
+def format_npc_description(desc: str) -> str:
+    """把三段介绍拆行显示，更易读。"""
+    text = _esc(desc)
+    for label in ("相识方式：", "第一印象：", "细节观察："):
+        text = text.replace(
+            label,
+            f'<br><br><span style="color:#f9a8d4;font-weight:600;font-style:normal;">'
+            f"{label}</span>",
+        )
+    return text.lstrip("<br><br>")
 
 
 def inject_theme() -> None:
@@ -53,10 +77,10 @@ def render_top_header(turn: int) -> None:
     open_card()
     st.markdown(
         f"""
-        <div style="padding:1rem 1.5rem;border-bottom:1px solid rgba(255,255,255,0.05);
+        <div style="padding:{S_PAD_BLOCK};border-bottom:1px solid rgba(255,255,255,0.05);
             background:rgba(15,23,42,0.5);display:flex;justify-content:space-between;align-items:center;">
             <div>
-                <div style="font-size:1.25rem;font-weight:900;font-style:italic;
+                <div style="font-size:1.4rem;font-weight:900;font-style:italic;
                     background:linear-gradient(90deg,#c084fc,#fb7185);
                     -webkit-background-clip:text;-webkit-text-fill-color:transparent;
                     background-clip:text;line-height:1.2;">压抑模拟器</div>
@@ -65,7 +89,7 @@ def render_top_header(turn: int) -> None:
             </div>
             <div style="text-align:right;">
                 <div style="font-size:10px;font-weight:700;color:#64748b;text-transform:uppercase;">Round</div>
-                <div style="font-size:1.5rem;font-weight:700;font-family:ui-monospace,monospace;color:#fff;line-height:1;">{turn_disp}</div>
+                <div style="font-size:1.75rem;font-weight:700;font-family:ui-monospace,monospace;color:#fff;line-height:1;">{turn_disp}</div>
             </div>
         </div>
         """,
@@ -84,26 +108,26 @@ def render_stat_bars(repression: int, health: int) -> None:
         )
     st.markdown(
         f"""
-        <div style="padding:1rem 1.5rem;background:rgba(15,23,42,0.3);">
-            <div style="margin-bottom:0.75rem;">
-                <div style="display:flex;justify-content:space-between;font-size:11px;
-                    font-weight:700;text-transform:uppercase;letter-spacing:0.05em;margin-bottom:0.25rem;">
+        <div style="padding:{S_PAD_BLOCK};background:rgba(15,23,42,0.3);">
+            <div style="margin-bottom:1rem;">
+                <div style="display:flex;justify-content:space-between;font-size:12px;
+                    font-weight:700;text-transform:uppercase;letter-spacing:0.05em;margin-bottom:0.35rem;">
                     <span style="color:#fb7185;">🔥 压抑值</span>
                     <span style="color:#fff;">{repression} / {REPRESSION_MAX}</span>
                 </div>
-                <div style="width:100%;background:#1e293b;border-radius:9999px;height:8px;padding:2px;
+                <div style="width:100%;background:#1e293b;border-radius:9999px;height:11px;padding:2px;
                     box-shadow:inset 0 1px 3px rgba(0,0,0,0.4);">
                     <div style="height:100%;border-radius:9999px;width:{rep_pct}%;
                         background:linear-gradient(90deg,#10b981,#f43f5e);"></div>
                 </div>
             </div>
             <div>
-                <div style="display:flex;justify-content:space-between;font-size:11px;
-                    font-weight:700;text-transform:uppercase;letter-spacing:0.05em;margin-bottom:0.25rem;">
+                <div style="display:flex;justify-content:space-between;font-size:12px;
+                    font-weight:700;text-transform:uppercase;letter-spacing:0.05em;margin-bottom:0.35rem;">
                     <span style="color:#a78bfa;">💚 健康值</span>
                     <span style="color:#fff;">{health} / 100</span>
                 </div>
-                <div style="width:100%;background:#1e293b;border-radius:9999px;height:8px;padding:2px;
+                <div style="width:100%;background:#1e293b;border-radius:9999px;height:11px;padding:2px;
                     box-shadow:inset 0 1px 3px rgba(0,0,0,0.4);">
                     <div style="height:100%;border-radius:9999px;width:{health_pct}%;
                         background:linear-gradient(90deg,#6366f1,#8b5cf6);"></div>
@@ -146,21 +170,23 @@ def render_partner_card(npc: dict) -> None:
             'font-size:10px;font-weight:600;color:#fda4af;background:rgba(51,65,85,0.8);'
             'border:1px solid rgba(244,63,94,0.4);border-radius:9999px;">地雷</span>'
         )
-    desc = _esc(npc.get("description", ""))
+    desc_html = format_npc_description(npc.get("description", ""))
     name = _esc(npc.get("name", "???"))
     st.markdown(
         f"""
-        <div style="padding:1.5rem;text-align:center;">
-            <div style="width:5rem;height:5rem;margin:0 auto 0.75rem;border-radius:50%;
+        <div style="padding:1.75rem {S_PAD_X};text-align:center;">
+            <div style="width:6rem;height:6rem;margin:0 auto 1rem;border-radius:50%;
                 background:linear-gradient(135deg,#334155,#1e293b);border:2px solid #475569;
-                display:flex;align-items:center;justify-content:center;font-size:2.25rem;
+                display:flex;align-items:center;justify-content:center;font-size:2.75rem;
                 box-shadow:0 10px 25px rgba(0,0,0,0.5);">{npc_avatar(npc)}</div>
-            <h2 style="font-size:1.1rem;font-weight:700;color:#fff;margin:0 0 0.75rem;">
+            <h2 style="font-size:1.2rem;font-weight:700;color:#fff;margin:0 0 1rem;">
                 潜在伴侣 · {name}</h2>
-            <p style="font-size:15px;color:rgba(253,186,216,0.95);font-style:italic;line-height:1.75;
-                margin:0;padding:0 0.5rem;text-align:left;font-family:Georgia,'Noto Serif SC',serif;">
-                "{desc}"</p>
-            <div style="margin-top:0.75rem;">{badges}</div>
+            <div style="font-size:15px;color:rgba(253,186,216,0.95);line-height:1.8;
+                margin:0;padding:1rem 1.1rem;text-align:left;
+                background:rgba(30,41,59,0.45);border:1px solid rgba(255,255,255,0.06);
+                border-radius:1rem;font-family:'Noto Sans SC',Georgia,serif;">
+                {desc_html}</div>
+            <div style="margin-top:1rem;">{badges}</div>
         </div>
         """,
         unsafe_allow_html=True,
@@ -172,13 +198,13 @@ def render_clue_tags(clues: list[str]) -> None:
         return
     tags_html = "".join(
         '<span style="display:inline-block;padding:0.2rem 0.55rem;margin:0.15rem;'
-        "font-size:10px;font-weight:600;color:#cbd5e1;background:rgba(51,65,85,0.8);"
+        "font-size:11px;font-weight:600;color:#cbd5e1;background:rgba(51,65,85,0.8);"
         'border:1px solid rgba(255,255,255,0.08);border-radius:9999px;">'
-        f"{_esc(c[:28])}</span>"
+        f"{_esc(c[:48])}</span>"
         for c in clues
     )
     st.markdown(
-        f'<div style="text-align:center;padding:0 1rem 0.5rem;">{tags_html}</div>',
+        f'<div style="text-align:center;padding:0 {S_PAD_X} 0.75rem;">{tags_html}</div>',
         unsafe_allow_html=True,
     )
 
@@ -193,8 +219,8 @@ def action_button_label(key: str) -> str:
 
 def section_title(text: str) -> None:
     st.markdown(
-        f'<p style="font-size:11px;font-weight:700;color:#94a3b8;text-transform:uppercase;'
-        f'letter-spacing:0.08em;margin:0 0 0.5rem;padding:0 1.25rem;">{text}</p>',
+        f'<p style="font-size:12px;font-weight:700;color:#94a3b8;text-transform:uppercase;'
+        f'letter-spacing:0.08em;margin:0 0 0.65rem;padding:0 {S_PAD_X};">{text}</p>',
         unsafe_allow_html=True,
     )
 
@@ -202,15 +228,15 @@ def section_title(text: str) -> None:
 def render_intro_screen() -> None:
     st.markdown(
         f"""
-        <div style="{S_CARD}text-align:center;padding:2rem 1.5rem;">
-            <div style="font-size:4rem;margin-bottom:1rem;
+        <div style="{S_CARD}text-align:center;padding:2.25rem {S_PAD_X};">
+            <div style="font-size:4.5rem;margin-bottom:1.25rem;
                 filter:drop-shadow(0 0 15px rgba(236,72,153,0.5));">💘</div>
-            <div style="font-size:1.75rem;font-weight:900;color:#fff;margin-bottom:0.25rem;">压抑模拟器</div>
-            <div style="font-size:10px;font-weight:700;color:#64748b;letter-spacing:0.15em;
-                text-transform:uppercase;margin-bottom:1rem;">Survival Edition</div>
-            <div style="text-align:left;font-size:14px;color:#cbd5e1;background:rgba(30,41,59,0.5);
-                border:1px solid rgba(255,255,255,0.05);border-radius:0.75rem;padding:1.25rem;
-                line-height:1.75;">
+            <div style="font-size:2rem;font-weight:900;color:#fff;margin-bottom:0.35rem;">压抑模拟器</div>
+            <div style="font-size:11px;font-weight:700;color:#64748b;letter-spacing:0.15em;
+                text-transform:uppercase;margin-bottom:1.25rem;">Survival Edition</div>
+            <div style="text-align:left;font-size:15px;color:#cbd5e1;background:rgba(30,41,59,0.5);
+                border:1px solid rgba(255,255,255,0.05);border-radius:1rem;padding:1.5rem 1.35rem;
+                line-height:1.8;">
                 <p>1. <b>延迟判决</b>：高危行为后，你<b>不会</b>立刻知道是否感染。</p>
                 <p>2. <b>双条生存</b>：压抑爆表或健康归零都会失败。</p>
                 <p>3. <b>试探取舍</b>：试纸与追问有用，但问太多对方可能离开。</p>
@@ -227,9 +253,9 @@ def render_settlement_box(text: str) -> None:
         return
     body = _esc(text)
     st.markdown(
-        f'<div style="padding:0 1.25rem 1rem;">'
+        f'<div style="padding:0 {S_PAD_X} 1.25rem;">'
         f'<div style="background:rgba(30,41,59,0.5);border:1px solid rgba(255,255,255,0.06);'
-        f"border-radius:0.75rem;padding:1rem;font-size:15px;line-height:1.75;color:#e2e8f0;"
+        f"border-radius:1rem;padding:1.25rem 1.35rem;font-size:15px;line-height:1.8;color:#e2e8f0;"
         f'white-space:pre-wrap;">{body}</div></div>',
         unsafe_allow_html=True,
     )
@@ -247,8 +273,8 @@ def render_warn_banner(message: str, *, tone: str = "warn") -> None:
             "background:rgba(120,53,15,0.25);"
         )
     st.markdown(
-        f'<div style="padding:0 1.25rem 1rem;"><div style="{style}font-size:12px;'
-        f'padding:0.65rem 1rem;border-radius:0.75rem;text-align:center;">'
+        f'<div style="padding:0 {S_PAD_X} 1.25rem;"><div style="{style}font-size:14px;'
+        f'padding:0.85rem 1.15rem;border-radius:1rem;text-align:center;">'
         f"{_esc(message)}</div></div>",
         unsafe_allow_html=True,
     )

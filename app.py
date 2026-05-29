@@ -29,6 +29,7 @@ from engine.game_state import (
 from ui.theme import (
     action_button_label,
     close_glass_card,
+    game_layout,
     inject_theme,
     render_clue_tags,
     render_intro_screen,
@@ -43,7 +44,7 @@ from ui.theme import (
 st.set_page_config(
     page_title="压抑模拟器",
     page_icon="🎭",
-    layout="centered",
+    layout="wide",
     initial_sidebar_state="collapsed",
 )
 
@@ -83,32 +84,38 @@ def render_hospital_row() -> None:
             st.caption(f"· {inf['disease_name']}：无法常规治疗")
 
 
+def _interaction_button(key: str) -> None:
+    cfg = INTERACTIONS[key]
+    used = interaction_already_used(key)
+    disabled = (
+        not st.session_state.awaiting_action
+        or used
+        or st.session_state.game_over
+    )
+    label = cfg["label"] + (" ✓" if used else "")
+    if st.button(
+        label,
+        key=f"interact_{key}",
+        use_container_width=True,
+        disabled=disabled,
+    ):
+        msg = apply_interaction(key)
+        st.session_state.last_result = msg
+        st.rerun()
+
+
 def render_tool_row() -> None:
-    """遭遇前快捷互动：试纸 + 说明。"""
+    """遭遇前互动：两行排布，避免五个按钮挤在一行。"""
     section_title("遭遇前试探")
     keys = list(INTERACTIONS.keys())
-    cols = st.columns(min(len(keys), 3))
-    for col, key in zip(cols, keys):
-        cfg = INTERACTIONS[key]
-        used = interaction_already_used(key)
-        disabled = (
-            not st.session_state.awaiting_action
-            or used
-            or st.session_state.game_over
-        )
+    row1 = st.columns(3)
+    for col, key in zip(row1, keys[:3]):
         with col:
-            label = cfg["label"]
-            if used:
-                label += " ✓"
-            if st.button(
-                label,
-                key=f"interact_{key}",
-                use_container_width=True,
-                disabled=disabled,
-            ):
-                msg = apply_interaction(key)
-                st.session_state.last_result = msg
-                st.rerun()
+            _interaction_button(key)
+    row2 = st.columns(2)
+    for col, key in zip(row2, keys[3:]):
+        with col:
+            _interaction_button(key)
 
 
 def render_action_grid() -> None:
@@ -185,8 +192,6 @@ def render_game_over() -> None:
     won = st.session_state.get("game_won", False)
     render_top_header(st.session_state.turn_count)
     render_stat_bars(st.session_state.repression, st.session_state.health)
-
-    st.markdown('<div class="section-pad">', unsafe_allow_html=True)
     if won:
         st.success(st.session_state.game_over_reason)
         st.info(
@@ -247,28 +252,29 @@ def main() -> None:
     check_victory()
     show_achievement_toasts()
 
-    if not st.session_state.ui_started:
-        render_intro_flow()
-        return
+    with game_layout():
+        if not st.session_state.ui_started:
+            render_intro_flow()
+            return
 
-    if st.session_state.game_over:
-        render_game_over()
-        return
+        if st.session_state.game_over:
+            render_game_over()
+            return
 
-    npc = st.session_state.current_npc
-    if not npc:
-        if st.session_state.turn_count > 0:
-            render_top_header(st.session_state.turn_count)
-            render_stat_bars(st.session_state.repression, st.session_state.health)
-            render_hospital_row()
-            close_glass_card()
-            render_between_encounters()
-            render_footer_panels()
-        else:
-            render_idle_start()
-        return
+        npc = st.session_state.current_npc
+        if not npc:
+            if st.session_state.turn_count > 0:
+                render_top_header(st.session_state.turn_count)
+                render_stat_bars(st.session_state.repression, st.session_state.health)
+                render_hospital_row()
+                close_glass_card()
+                render_between_encounters()
+                render_footer_panels()
+            else:
+                render_idle_start()
+            return
 
-    render_active_encounter()
+        render_active_encounter()
 
 
 if __name__ == "__main__":
