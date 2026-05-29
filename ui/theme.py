@@ -3,6 +3,7 @@
 from __future__ import annotations
 
 import html
+import re
 from contextlib import contextmanager
 
 import streamlit as st
@@ -35,15 +36,25 @@ def game_layout():
 
 
 def format_npc_description(desc: str) -> str:
-    """把三段介绍拆行显示，更易读。"""
-    text = _esc(desc)
-    for label in ("相识方式：", "第一印象：", "细节观察："):
-        text = text.replace(
-            label,
-            f'<br><br><span style="color:#f9a8d4;font-weight:600;font-style:normal;">'
-            f"{label}</span>",
+    """把三段介绍拆行显示（不用 span，避免 Streamlit 剥标签露代码）。"""
+    labels = ("相识方式：", "第一印象：", "细节观察：")
+    parts = re.split(r"(相识方式：|第一印象：|细节观察：)", desc)
+    if len(parts) < 3:
+        return f'<p style="margin:0;line-height:1.8;">{_esc(desc)}</p>'
+
+    blocks: list[str] = []
+    i = 1
+    while i < len(parts):
+        label = parts[i]
+        body = parts[i + 1].strip() if i + 1 < len(parts) else ""
+        blocks.append(
+            f'<p style="margin:0 0 0.25rem;line-height:1.6;color:#f9a8d4;font-weight:700;">'
+            f"{_esc(label)}</p>"
+            f'<p style="margin:0 0 0.85rem;line-height:1.75;color:rgba(253,186,216,0.95);">'
+            f"{_esc(body)}</p>"
         )
-    return text.lstrip("<br><br>")
+        i += 2
+    return "".join(blocks)
 
 
 def inject_theme() -> None:
@@ -112,8 +123,8 @@ def render_stat_bars(repression: int, health: int) -> None:
             <div style="margin-bottom:1rem;">
                 <div style="display:flex;justify-content:space-between;font-size:12px;
                     font-weight:700;text-transform:uppercase;letter-spacing:0.05em;margin-bottom:0.35rem;">
-                    <span style="color:#fb7185;">🔥 压抑值</span>
-                    <span style="color:#fff;">{repression} / {REPRESSION_MAX}</span>
+                    <div style="color:#fb7185;">🔥 压抑值</div>
+                    <div style="color:#fff;">{repression} / {REPRESSION_MAX}</div>
                 </div>
                 <div style="width:100%;background:#1e293b;border-radius:9999px;height:11px;padding:2px;
                     box-shadow:inset 0 1px 3px rgba(0,0,0,0.4);">
@@ -124,8 +135,8 @@ def render_stat_bars(repression: int, health: int) -> None:
             <div>
                 <div style="display:flex;justify-content:space-between;font-size:12px;
                     font-weight:700;text-transform:uppercase;letter-spacing:0.05em;margin-bottom:0.35rem;">
-                    <span style="color:#a78bfa;">💚 健康值</span>
-                    <span style="color:#fff;">{health} / 100</span>
+                    <div style="color:#a78bfa;">💚 健康值</div>
+                    <div style="color:#fff;">{health} / 100</div>
                 </div>
                 <div style="width:100%;background:#1e293b;border-radius:9999px;height:11px;padding:2px;
                     box-shadow:inset 0 1px 3px rgba(0,0,0,0.4);">
@@ -160,15 +171,15 @@ def render_partner_card(npc: dict) -> None:
     badges = ""
     if "coser" in tags:
         badges += (
-            '<span style="display:inline-block;padding:0.2rem 0.55rem;margin:0.15rem;'
-            'font-size:10px;font-weight:600;color:#cbd5e1;background:rgba(51,65,85,0.8);'
-            'border:1px solid rgba(255,255,255,0.08);border-radius:9999px;">Coser</span>'
+            '<div style="display:inline-block;padding:0.25rem 0.6rem;margin:0.2rem;'
+            'font-size:11px;font-weight:600;color:#cbd5e1;background:rgba(51,65,85,0.8);'
+            'border:1px solid rgba(255,255,255,0.08);border-radius:9999px;">Coser</div>'
         )
     if "trap" in tags:
         badges += (
-            '<span style="display:inline-block;padding:0.2rem 0.55rem;margin:0.15rem;'
-            'font-size:10px;font-weight:600;color:#fda4af;background:rgba(51,65,85,0.8);'
-            'border:1px solid rgba(244,63,94,0.4);border-radius:9999px;">地雷</span>'
+            '<div style="display:inline-block;padding:0.25rem 0.6rem;margin:0.2rem;'
+            'font-size:11px;font-weight:600;color:#fda4af;background:rgba(51,65,85,0.8);'
+            'border:1px solid rgba(244,63,94,0.4);border-radius:9999px;">地雷</div>'
         )
     desc_html = format_npc_description(npc.get("description", ""))
     name = _esc(npc.get("name", "???"))
@@ -197,10 +208,10 @@ def render_clue_tags(clues: list[str]) -> None:
     if not clues:
         return
     tags_html = "".join(
-        '<span style="display:inline-block;padding:0.2rem 0.55rem;margin:0.15rem;'
+        '<div style="display:inline-block;padding:0.25rem 0.6rem;margin:0.2rem;'
         "font-size:11px;font-weight:600;color:#cbd5e1;background:rgba(51,65,85,0.8);"
         'border:1px solid rgba(255,255,255,0.08);border-radius:9999px;">'
-        f"{_esc(c[:48])}</span>"
+        f"{_esc(c[:48])}</div>"
         for c in clues
     )
     st.markdown(
