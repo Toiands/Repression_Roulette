@@ -12,6 +12,11 @@ from config import (
 )
 from engine.copy import pick_health_edu
 from engine.event_system import apply_interaction, begin_encounter, resolve_action
+from engine.achievements import (
+    render_achievements_sidebar,
+    render_new_achievements_banner,
+    show_achievement_toasts,
+)
 from engine.game_state import (
     check_game_over,
     get_disease_display,
@@ -102,6 +107,8 @@ def render_sidebar() -> None:
                             detail[:120] + ("…" if len(detail) > 120 else "")
                         )
 
+        render_achievements_sidebar()
+
         if st.button("重新开始", type="secondary"):
             reset_game()
             st.rerun()
@@ -190,7 +197,7 @@ def render_game_over() -> None:
     if won:
         st.success(st.session_state.game_over_reason)
         st.info(
-            "坚持到第 25 回合很不容易。现实中请继续保持：固定伴侣沟通、安全套、定期筛查、"
+            f"坚持到第 {WIN_TURN_TARGET} 回合很不容易。现实中请继续保持：固定伴侣沟通、安全套、定期筛查、"
             "有症状尽早就医——这些习惯比任何一次侥幸都可靠。"
         )
     else:
@@ -206,6 +213,7 @@ def render_game_over() -> None:
         st.metric("最终健康值", st.session_state.health)
     with col3:
         st.metric("存活回合", st.session_state.turn_count)
+    render_new_achievements_banner()
     if st.button("再来一局", type="primary"):
         reset_game()
         st.rerun()
@@ -262,6 +270,7 @@ def main() -> None:
     check_victory()
 
     render_sidebar()
+    show_achievement_toasts()
 
     if st.session_state.game_over:
         render_game_over()

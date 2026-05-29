@@ -7,7 +7,20 @@ from typing import Any
 
 import streamlit as st
 
-from config import ACTIONS, INFECTION_NARRATIVES, INTERACTIONS, NPC_FLEE_REPRESSION_PENALTY, PROBING_INTERACTIONS
+from config import (
+    ACTIONS,
+    CONDOM_BREACH_CHANCE,
+    CONDOM_BREACH_RISK_MULTIPLIER,
+    INFECTION_NARRATIVES,
+    INTERACTIONS,
+    NPC_FLEE_REPRESSION_PENALTY,
+    PROBING_INTERACTIONS,
+    SAFE_STREAK_LONELINESS_BASE,
+    SAFE_STREAK_LONELINESS_START,
+    SAFE_STREAK_LONELINESS_STEP,
+    SPAWN_HIGH_RISK_BIAS_AFTER_TURN,
+    SPAWN_HIGH_RISK_WEIGHT_FACTOR,
+)
 from engine.game_state import (
     add_infection,
     append_clue,
@@ -24,6 +37,7 @@ from engine.game_state import (
 )
 from engine.copy import pick_health_edu
 from engine.risk_calculator import (
+    calc_infection_probability,
     create_infection_record,
     get_action_infection_probability,
     pick_disease_for_depth,
@@ -44,10 +58,20 @@ def spawn_npc() -> dict[str, Any]:
         pool = list(all_npcs)
         append_history("嘉宾轮换", "本局嘉宾已全部登场，池子重新洗牌", "")
 
-    npc = random.choice(pool)
+    turn = st.session_state.turn_count
+    if turn > SPAWN_HIGH_RISK_BIAS_AFTER_TURN:
+        weights = [
+            1.0 + float(n["base_risk"]) * SPAWN_HIGH_RISK_WEIGHT_FACTOR for n in pool
+        ]
+        npc = random.choices(pool, weights=weights, k=1)[0]
+    else:
+        npc = random.choice(pool)
     st.session_state.met_npc_ids.append(npc["id"])
     st.session_state.current_npc = npc
     st.session_state.awaiting_action = True
+    from engine.achievements import record_npc_encounter
+
+    record_npc_encounter(npc)
     return npc
 
 
@@ -84,6 +108,9 @@ def trigger_npc_flee(npc_name: str) -> str:
     _end_encounter()
     st.session_state.last_result = result
     append_history("对方跑路", f"{npc_name} 因追问过多离开", result)
+    from engine.achievements import record_npc_fled
+
+    record_npc_fled()
     after_encounter_resolved()
     return result
 
@@ -209,20 +236,47 @@ def resolve_action(action_key: str) -> str:
 
     lines.append(f"你选择了【{action['label']}】，与 {npc['name']} 的互动结束。")
 
+    from engine.achievements import check_achievements, record_action, record_infection
+
+    record_action(action_key)
+
     old_rep = st.session_state.repression
     apply_repression_delta(action["repression_delta"])
+
+    if action_key == "A":
+        streak = int(st.session_state.get("safe_streak", 0)) + 1
+        st.session_state.safe_streak = streak
+        if streak >= SAFE_STREAK_LONELINESS_START:
+            extra = SAFE_STREAK_LONELINESS_BASE + (
+                streak - SAFE_STREAK_LONELINESS_START
+            ) * SAFE_STREAK_LONELINESS_STEP
+            apply_repression_delta(extra)
+            lines.append(f"一再克制让今晚更空（压抑额外 +{extra}）。")
+    else:
+        st.session_state.safe_streak = 0
+
     lines.append(
-        f"压抑值 {old_rep} → {st.session_state.repression}（变化 {action['repression_delta']:+d}）。"
+        f"压抑值 {old_rep} → {st.session_state.repression}（含行动与额外变化）。"
     )
 
-    prob = get_action_infection_probability(action, _npc_risk(npc))
+    risk = _npc_risk(npc)
+    prob = get_action_infection_probability(action, risk)
+    breach = False
+    if action_key == "A" and prob > 0 and random.random() < CONDOM_BREACH_CHANCE:
+        breach = True
+        prob = calc_infection_probability(risk, CONDOM_BREACH_RISK_MULTIPLIER)
 
     if prob > 0:
         if roll_infection(prob):
+            if breach:
+                lines.append("你明明做了防护，仍出了难以预料的疏漏……")
             disease = pick_disease_for_depth(action["depth"], diseases)
             if disease:
                 if disease.get("instant_game_over"):
                     trigger_instant_game_over("确诊 HIV，游戏结束。")
+                    from engine.achievements import record_hiv_game_over
+
+                    record_hiv_game_over()
                     lines.append(
                         "确诊 **HIV**，精神与健康防线瞬间崩溃，游戏立刻结束。"
                     )
@@ -236,6 +290,7 @@ def resolve_action(action_key: str) -> str:
                     record["action_label"] = action["label"]
                     record["encounter_turn"] = st.session_state.turn_count
                     add_infection(record)
+                    record_infection(disease["id"], npc)
                     lines.append(
                         f"你已感染「{disease['name']}」，"
                         f"潜伏期 {disease['incubation_turns']} 轮（尚未扣血）。"
@@ -260,5 +315,6 @@ def resolve_action(action_key: str) -> str:
     _end_encounter()
     st.session_state.last_result = result
     append_history("亲密抉择", f"{action['label']} @ {npc['name']}", result)
+    check_achievements()
     after_encounter_resolved()
     return result

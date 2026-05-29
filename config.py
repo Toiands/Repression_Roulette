@@ -17,11 +17,24 @@ HEALTH_MIN = 0
 # 医院治疗导致的压抑值上升
 TREATMENT_REPRESSION_PENALTY = 50
 
-# 每轮新事件自动增加的压抑值
+# 每轮新事件自动增加的压抑值（随回合略升，见 game_state.repression_increase_for_turn）
 EVENT_REPRESSION_INCREASE = 10
+EVENT_REPRESSION_SCALE_EVERY = 4  # 每满 N 回合，自动压抑额外 +2
+EVENT_REPRESSION_SCALE_STEP = 2
 
 # 胜利条件：存活回合数
-WIN_TURN_TARGET = 25
+WIN_TURN_TARGET = 10
+
+# 中后期嘉宾池更偏高危（仍不重复）
+SPAWN_HIGH_RISK_BIAS_AFTER_TURN = 3
+SPAWN_HIGH_RISK_WEIGHT_FACTOR = 2.8
+
+# 全程安全保护：无法无脑通关
+CONDOM_BREACH_CHANCE = 0.12  # 有套仍可能疏漏，按更高系数重算感染
+CONDOM_BREACH_RISK_MULTIPLIER = 0.22
+SAFE_STREAK_LONELINESS_START = 3  # 连续第 N 次选安全保护起算孤独惩罚
+SAFE_STREAK_LONELINESS_BASE = 6
+SAFE_STREAK_LONELINESS_STEP = 4
 
 # 遭遇前「追问/试探」类互动累计过多，对方跑路（每轮随机阈值，不对玩家显示）
 PROBING_INTERACTIONS = (
@@ -68,9 +81,10 @@ ACTIONS = {
     "A": {
         "key": "A",
         "label": "全程安全保护",
-        "repression_delta": -10,
-        "risk_multiplier": 0.02,
-        "risk_coefficient_label": "2%",
+        "description": "相对稳妥，但并非零风险；连续选择会累积孤独",
+        "repression_delta": -6,
+        "risk_multiplier": 0.06,
+        "risk_coefficient_label": "6%",
         "depth": "shallow",
     },
     "B": {
@@ -118,9 +132,9 @@ RISK_TIERS = {
 
 # 开局介绍
 GAME_INTRO = """
-**压抑模拟器**是一款文字生存决策游戏。你要在「压抑值」与「健康值」之间找平衡：压抑爆表或健康归零都会失败，**存活 25 回合**即胜利。
+**压抑模拟器**是一款文字生存决策游戏。你要在「压抑值」与「健康值」之间找平衡：压抑爆表或健康归零都会失败，**存活 10 回合**即胜利。
 
-每轮你会遇到一位陌生女嘉宾。可先试探（试纸、问病史、看报告等），再选择亲密程度。谁更安全、谁更危险不会直接告诉你，只能从侧写和互动里自己判断；选得更冒险，后果也可能在事后才显现。
+每轮你会遇到一位陌生女嘉宾。可先试探（试纸、问病史、看报告等），再选择亲密程度。越到后期越难遇到「看起来安全」的人；一味全程保护能保命，但压抑会缓慢爬升，孤独也会叠加。侧边栏可查看**成就**（同一浏览器会尽量保留解锁记录）。谁更安全只能靠自己判断，后果常在事后才显现。
 
 **健康提示：** 正确使用安全套、减少无保护行为、有疑虑时先做检测、尽早治疗，是预防梅毒、尖锐湿疣与 HIV 的关键。本游戏为虚构模拟，请勿替代真实医疗建议。
 """

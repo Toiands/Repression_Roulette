@@ -10,6 +10,8 @@ import streamlit as st
 from config import (
     DISEASES_FILE,
     EVENT_REPRESSION_INCREASE,
+    EVENT_REPRESSION_SCALE_EVERY,
+    EVENT_REPRESSION_SCALE_STEP,
     HEALTH_EDU_TIPS,
     HEALTH_MIN,
     HEALTH_START,
@@ -19,6 +21,12 @@ from config import (
     TREATMENT_REPRESSION_PENALTY,
     WIN_TURN_TARGET,
 )
+
+
+def repression_increase_for_turn(turn: int) -> int:
+    """第 turn 回合开始时自动增加的压抑值（后期略升）。"""
+    extra = max(0, (turn - 1) // EVENT_REPRESSION_SCALE_EVERY) * EVENT_REPRESSION_SCALE_STEP
+    return EVENT_REPRESSION_INCREASE + extra
 
 
 def _load_json(path) -> list[dict[str, Any]]:
@@ -65,6 +73,7 @@ def init_session_state() -> None:
         "history_log": [],
         "met_npc_ids": [],
         "game_won": False,
+        "safe_streak": 0,
     }
     for key, value in defaults.items():
         if key not in st.session_state:
@@ -80,15 +89,35 @@ def init_session_state() -> None:
         st.session_state.met_npc_ids = []
     if "game_won" not in st.session_state:
         st.session_state.game_won = False
+    if "safe_streak" not in st.session_state:
+        st.session_state.safe_streak = 0
     load_game_data()
+    from engine.achievements import begin_new_run_achievements, init_achievement_state
+
+    init_achievement_state()
+    if st.session_state.turn_count == 0 and not st.session_state.get(
+        "achievements_at_run_start"
+    ):
+        begin_new_run_achievements()
 
 
 def reset_game() -> None:
-    """重置游戏。"""
+    """重置游戏（保留跨局成就）。"""
+    preserved = {
+        "achievements_persistent": st.session_state.get(
+            "achievements_persistent", []
+        ),
+        "_ach_storage_loaded": True,
+    }
     keys_to_clear = list(st.session_state.keys())
     for key in keys_to_clear:
         del st.session_state[key]
     init_session_state()
+    for key, value in preserved.items():
+        st.session_state[key] = value
+    from engine.achievements import begin_new_run_achievements
+
+    begin_new_run_achievements()
 
 
 def clamp_repression(value: int) -> int:
@@ -169,9 +198,11 @@ def tick_infections() -> list[str]:
 def start_new_event_turn() -> list[str]:
     """开启新遭遇：压抑值自动增加，推进疾病。"""
     logs: list[str] = []
-    st.session_state.turn_count += 1
-    apply_repression_delta(EVENT_REPRESSION_INCREASE)
-    logs.append(f"新遭遇开始，压抑值自动 +{EVENT_REPRESSION_INCREASE}。")
+    turn = st.session_state.turn_count + 1
+    inc = repression_increase_for_turn(turn)
+    st.session_state.turn_count = turn
+    apply_repression_delta(inc)
+    logs.append(f"新遭遇开始，压抑值自动 +{inc}。")
     logs.extend(tick_infections())
     return logs
 
@@ -227,6 +258,9 @@ def after_encounter_resolved() -> None:
     check_game_over()
     if not st.session_state.game_over:
         check_victory()
+    from engine.achievements import check_achievements
+
+    check_achievements()
 
 
 def trigger_instant_game_over(reason: str) -> None:
@@ -257,6 +291,9 @@ def treat_disease(index: int) -> str:
         f"压抑值 {old_rep} → {st.session_state.repression}（治疗代价 +{TREATMENT_REPRESSION_PENALTY}）。"
     )
     append_history("治疗", f"治愈 {removed['disease_name']}", msg)
+    from engine.achievements import record_treatment
+
+    record_treatment()
     check_game_over()
     return msg
 
