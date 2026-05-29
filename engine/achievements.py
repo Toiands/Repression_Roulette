@@ -239,7 +239,8 @@ def render_achievements_sidebar(*, compact: bool = False) -> None:
         st.subheader("成就")
     st.caption(f"已解锁 {len(unlocked)} / {total}（同浏览器可保留）")
 
-    with st.expander("查看全部成就", expanded=False):
+    list_block = st.expander("查看全部成就", expanded=compact) if not compact else st.container()
+    with list_block:
         for aid, meta in ACHIEVEMENTS.items():
             if aid in unlocked:
                 st.markdown(

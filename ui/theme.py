@@ -429,9 +429,8 @@ def action_button_label(key: str) -> str:
     act = ACTIONS[key]
     icons = {"A": "🛡️", "B": "🍬", "C": "🔥", "D": "👋"}
     icon = icons.get(key, "▪️")
-    sub = act.get("description") or act["label"]
     rep = act["repression_delta"]
-    return f"{icon} {act['label']}\n压抑 {rep:+d} · {sub[:12]}"
+    return f"{icon} {act['label']} · 压抑{rep:+d}"
 
 
 def render_intro_screen() -> None:
