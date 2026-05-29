@@ -44,8 +44,8 @@ from engine.npc_policy import (
     dialogue_discuss_protection,
     dialogue_observe,
     dialogue_request_report,
-    is_action_allowed,
     ensure_npc_policy,
+    is_action_allowed,
 )
 from engine.risk_calculator import (
     calc_infection_probability,
@@ -237,14 +237,20 @@ def resolve_action(action_key: str) -> str:
     apply_repression_delta(action["repression_delta"])
 
     if action_key == "A":
-        streak = int(st.session_state.get("safe_streak", 0)) + 1
-        st.session_state.safe_streak = streak
-        if streak >= SAFE_STREAK_LONELINESS_START:
-            extra = SAFE_STREAK_LONELINESS_BASE + (
-                streak - SAFE_STREAK_LONELINESS_START
-            ) * SAFE_STREAK_LONELINESS_STEP
-            apply_repression_delta(extra)
-            lines.append(f"一再克制让今晚更空（压抑额外 +{extra}）。")
+        had_riskier_option = is_action_allowed(npc, "B") or is_action_allowed(
+            npc, "C"
+        )
+        if had_riskier_option:
+            streak = int(st.session_state.get("safe_streak", 0)) + 1
+            st.session_state.safe_streak = streak
+            if streak >= SAFE_STREAK_LONELINESS_START:
+                extra = SAFE_STREAK_LONELINESS_BASE + (
+                    streak - SAFE_STREAK_LONELINESS_START
+                ) * SAFE_STREAK_LONELINESS_STEP
+                apply_repression_delta(extra)
+                lines.append(f"一再克制让今晚更空（压抑额外 +{extra}）。")
+        else:
+            st.session_state.safe_streak = 0
     else:
         st.session_state.safe_streak = 0
 

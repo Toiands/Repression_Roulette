@@ -15,9 +15,9 @@ sys.path.insert(0, str(ROOT))
 OUT = ROOT / "data" / "npcs.json"
 
 from engine.npc_policy import (  # noqa: E402
+    assign_policies_to_npcs,
     ensure_npc_policy,
     is_policy_mine,
-    roll_action_policy_for_npc,
     suggested_policy_from_risk,
 )
 
@@ -352,17 +352,12 @@ def build_tier_npc(
 
     imp = imp_o + "，" + imp_c
     desc = compose(meeting, imp, det if det else pad, pad="")
-    policy, is_mine = roll_action_policy_for_npc(risk, tags)
-    out_tags = list(tags)
-    if is_mine and "policy_mine" not in out_tags:
-        out_tags.append("policy_mine")
     return {
         "name": name,
         "description": desc,
         "base_risk": risk,
-        "tags": out_tags,
+        "tags": list(tags),
         "tier": tier,
-        "action_policy": policy,
     }
 
 
@@ -450,20 +445,16 @@ def main() -> None:
         if len(desc) > MAX_LEN:
             desc = desc[: MAX_LEN - 1] + "…"
         drisk = pick_risk(0.85, 0.95)
-        dtags = list(d["tags"])
-        dpolicy, dmine = roll_action_policy_for_npc(drisk, dtags)
-        if dmine and "policy_mine" not in dtags:
-            dtags.append("policy_mine")
         npcs.append({
             "name": d["name"],
             "description": desc,
             "base_risk": drisk,
-            "tags": dtags,
+            "tags": list(d["tags"]),
             "tier": "deadly",
-            "action_policy": dpolicy,
         })
 
     random.shuffle(npcs)
+    assign_policies_to_npcs(npcs)
 
     # 去重描述微调
     seen_desc: set[str] = set()
@@ -492,8 +483,6 @@ def main() -> None:
     for n in npcs:
         assert not FORBIDDEN_PLACES.search(n["description"])
         ensure_npc_policy(n)
-        if is_policy_mine(n) and "policy_mine" not in n.get("tags", []):
-            n.setdefault("tags", []).append("policy_mine")
 
     tier_counts = {"low": 0, "active": 0, "high": 0, "deadly": 0}
     for r in risks:
@@ -512,6 +501,10 @@ def main() -> None:
     print(f"生成完成: {len(npcs)} 人")
     print(f"字数: {min(lens)}-{max(lens)} 平均{sum(lens)/len(lens):.1f}")
     print(f"阶梯计数(按risk): {tier_counts}")
+    from collections import Counter
+
+    pol = Counter(n["action_policy"] for n in npcs)
+    print(f"策略配额: {dict(pol)}")
     traps = [n for n in npcs if "trap" in n.get("tags", [])]
     mines = [n for n in npcs if "policy_mine" in n.get("tags", [])]
     print(f"地雷: {[t['name'] for t in traps]} -> {[t['base_risk'] for t in traps]}")

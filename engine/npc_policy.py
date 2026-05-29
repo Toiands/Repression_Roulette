@@ -15,8 +15,8 @@ ACTION_POLICIES: dict[str, dict[str, Any]] = {
         "hint": "",
     },
     "refuse_raw": {
-        "blocked": ["B", "C"],
-        "hint": "对方不接受无保护或半保护行为",
+        "blocked": ["C"],
+        "hint": "对方不接受全程无套",
     },
     "refuse_condom": {
         "blocked": ["A"],
@@ -24,8 +24,13 @@ ACTION_POLICIES: dict[str, dict[str, Any]] = {
     },
 }
 
+# 生成配额（与 base_risk 脱钩，避免过半只能选 A）
+POLICY_QUOTA_REFUSE_RAW = 25
+POLICY_QUOTA_REFUSE_CONDOM = 30
+POLICY_QUOTA_DEFAULT = 45
+
 # 生成时：与 suggested 不一致则打 policy_mine 标签
-POLICY_MINE_RATE = 0.16
+POLICY_MINE_RATE = 0.13
 
 
 def suggested_policy_from_risk(risk: float, tags: list[str] | None = None) -> str:
@@ -105,7 +110,7 @@ def dialogue_discuss_protection(npc: dict[str, Any]) -> str:
     policy = get_action_policy(npc)
 
     if policy == "refuse_raw":
-        return f"{name} 态度很明确：不接受无保护，希望全程做好防护。"
+        return f"{name} 态度明确：不接受全程无套，但可接受有保护的亲密方式。"
     if policy == "refuse_condom":
         return f"{name} 对戴套表现出抵触，说「别搞那么复杂」。"
     return _pick_stable(
@@ -158,31 +163,65 @@ def dialogue_observe(npc: dict[str, Any]) -> str:
     return "你注意到皮疹结痂、针眼旧痕或强烈异味等危险信号。"
 
 
-def roll_action_policy_for_npc(
-    risk: float, tags: list[str] | None = None
-) -> tuple[str, bool]:
-    """
-    生成嘉宾策略：多数符合风险常理，约 POLICY_MINE_RATE 故意错位。
-    返回 (policy, is_mine)。
-    """
-    tags = list(tags or [])
-    suggested = suggested_policy_from_risk(risk, tags)
+def build_policy_deck() -> list[str]:
+    """按配额生成 100 人策略牌堆（与 risk 独立）。"""
+    deck = (
+        ["refuse_raw"] * POLICY_QUOTA_REFUSE_RAW
+        + ["refuse_condom"] * POLICY_QUOTA_REFUSE_CONDOM
+        + ["default"] * POLICY_QUOTA_DEFAULT
+    )
+    assert len(deck) == 100
+    random.shuffle(deck)
+    return deck
 
+
+def apply_policy_mine_flip(npc: dict[str, Any]) -> bool:
+    """约 POLICY_MINE_RATE 概率故意错位；仅翻转时打 policy_mine 标签。"""
+    tags = list(npc.get("tags") or [])
     if "trap" in tags:
-        # 致命地雷：高感染风险 + 不要戴套；与常理一致，不算 policy 雷
-        return "refuse_condom", False
+        return False
 
     if random.random() >= POLICY_MINE_RATE:
-        return suggested, False
+        return False
 
-    if suggested == "refuse_raw":
+    risk = float(npc.get("base_risk", 0))
+    current = npc.get("action_policy", "default")
+    suggested = suggested_policy_from_risk(risk, tags)
+
+    if current == "refuse_raw":
         alt = random.choice(["refuse_condom", "default"])
-    elif suggested == "refuse_condom":
+    elif current == "refuse_condom":
         alt = random.choice(["refuse_raw", "default"])
     else:
         alt = random.choice(["refuse_raw", "refuse_condom"])
+    if alt == current:
+        alt = "refuse_condom" if current != "refuse_condom" else "refuse_raw"
 
-    if alt == suggested:
-        # 保底改成另一种
-        alt = "refuse_condom" if suggested != "refuse_condom" else "refuse_raw"
-    return alt, True
+    npc["action_policy"] = alt
+    if alt != suggested and "policy_mine" not in tags:
+        tags.append("policy_mine")
+        npc["tags"] = tags
+    return alt != suggested
+
+
+def assign_policies_to_npcs(npcs: list[dict[str, Any]]) -> None:
+    """为已生成嘉宾批量分配 action_policy（配额与 risk 脱钩 + 少量掺雷）。"""
+    traps = [n for n in npcs if "trap" in (n.get("tags") or [])]
+    normals = [n for n in npcs if "trap" not in (n.get("tags") or [])]
+    trap_count = len(traps)
+    condom_quota = POLICY_QUOTA_REFUSE_CONDOM - trap_count
+
+    deck = (
+        ["refuse_raw"] * POLICY_QUOTA_REFUSE_RAW
+        + ["refuse_condom"] * condom_quota
+        + ["default"] * POLICY_QUOTA_DEFAULT
+    )
+    assert len(deck) == len(normals), (len(deck), len(normals))
+    random.shuffle(deck)
+
+    for npc, policy in zip(normals, deck):
+        npc["action_policy"] = policy
+        apply_policy_mine_flip(npc)
+
+    for npc in traps:
+        npc["action_policy"] = "refuse_condom"
