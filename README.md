@@ -26,24 +26,18 @@ GitHub 只存代码；要让**不同局域网**的人玩，需要再部署到 [S
 
 ### 1. 推送到 GitHub
 
-本目录即仓库根目录。在 GitHub 网页新建**空仓库**（例如 `repression-simulator`，不要勾选 README），然后：
+本目录即仓库根目录。远程仓库示例：[Toiands/Repression_Roulette](https://github.com/Toiands/Repression_Roulette)
 
 ```bash
 cd repression_simulator   # 本仓库根目录
-git remote add origin https://github.com/<你的用户名>/repression-simulator.git
+git remote add origin git@github.com:Toiands/Repression_Roulette.git
 git push -u origin main
-```
-
-若已用 GitHub CLI 登录，也可一键创建并推送：
-
-```bash
-gh repo create repression-simulator --public --source=. --remote=origin --push
 ```
 
 ### 2. 部署到 Streamlit Cloud
 
 1. 打开 https://share.streamlit.io ，用 GitHub 登录  
-2. **New app** → 选仓库 `repression-simulator`、分支 `main`  
+2. **New app** → 选仓库 `Repression_Roulette`、分支 `main`  
 3. **Main file path** 填：`app.py`  
 4. **Deploy**，等待构建完成  
 5. 把生成的 `https://xxx.streamlit.app` 链接发给群友  
