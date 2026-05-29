@@ -39,7 +39,14 @@ from engine.game_state import (
 )
 from engine.roster import append_encounter_roster
 from engine.copy import pick_health_edu
-from engine.npc_policy import is_action_allowed
+from engine.npc_policy import (
+    dialogue_ask_history,
+    dialogue_discuss_protection,
+    dialogue_observe,
+    dialogue_request_report,
+    is_action_allowed,
+    sync_npc_policy,
+)
 from engine.risk_calculator import (
     calc_infection_probability,
     create_infection_record,
@@ -71,6 +78,7 @@ def spawn_npc() -> dict[str, Any]:
         npc = random.choices(pool, weights=weights, k=1)[0]
     else:
         npc = random.choice(pool)
+    sync_npc_policy(npc)
     st.session_state.met_npc_ids.append(npc["id"])
     st.session_state.current_npc = npc
     st.session_state.awaiting_action = True
@@ -160,43 +168,16 @@ def _run_interaction_body(interaction_key: str, npc: dict[str, Any], risk: float
         lines.append(msg)
 
     elif interaction_key == "ask_history":
-        if risk < 0.25:
-            lines.append(f"{name} 坦然提到近期体检正常，语气自然。")
-        elif risk < 0.55:
-            lines.append(f"{name} 含糊其辞，称「上火吃过抗生素」但说不清药名。")
-        else:
-            lines.append(f"{name} 明显不耐烦，拒绝深谈病史。")
+        lines.append(dialogue_ask_history(npc))
 
     elif interaction_key == "request_report":
-        roll = random.random()
-        if risk < 0.3 and roll < 0.85:
-            lines.append(f"{name} 主动出示近期阴性报告，看起来靠谱。")
-        elif risk < 0.65:
-            if roll < 0.5:
-                lines.append(f"{name} 推脱说报告忘带了，眼神闪躲。")
-            else:
-                lines.append(f"{name} 出示三个月前的报告，称「最近忙没复查」。")
-        else:
-            if roll < 0.35:
-                lines.append(f"{name} 强硬拒绝：「不信就算了」。")
-            else:
-                lines.append(f"{name} 拿出模糊手机截图，日期看不清，可疑。")
+        lines.append(dialogue_request_report(npc))
 
     elif interaction_key == "observe":
-        if risk < 0.25:
-            lines.append("你注意到对方精神状态稳定，体表无明显异常。")
-        elif risk < 0.55:
-            lines.append("你注意到遮瑕痕迹、旧抓痕或药物包装等疑点。")
-        else:
-            lines.append("你注意到皮疹结痂、针眼旧痕或强烈异味等危险信号。")
+        lines.append(dialogue_observe(npc))
 
     elif interaction_key == "discuss_protection":
-        if risk < 0.3:
-            lines.append(f"{name} 主动提出全程做好防护，态度配合。")
-        elif risk < 0.65:
-            lines.append(f"{name} 口头答应，但对具体措施显得敷衍。")
-        else:
-            lines.append(f"{name} 对安全措施抵触，倾向「别那么多事」。")
+        lines.append(dialogue_discuss_protection(npc))
 
     return lines
 

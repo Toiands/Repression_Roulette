@@ -5,12 +5,16 @@ from __future__ import annotations
 import json
 import random
 import re
+import sys
 from pathlib import Path
 
 random.seed(2025)
 
 ROOT = Path(__file__).resolve().parents[1]
+sys.path.insert(0, str(ROOT))
 OUT = ROOT / "data" / "npcs.json"
+
+from engine.npc_policy import policy_from_risk, sync_npc_policy  # noqa: E402
 
 MIN_LEN, MAX_LEN = 100, 140
 FORBIDDEN_PLACES = re.compile(
@@ -322,48 +326,6 @@ def pick_risk(lo: float, hi: float) -> float:
     return round(random.uniform(lo, hi), 2)
 
 
-def assign_action_policy(
-    tier: str, risk: float, tags: list[str], desc: str
-) -> str:
-    """为嘉宾分配亲密选项策略（与描述、风险档一致）。"""
-    if "trap" in tags:
-        return "refuse_condom"
-    if any(
-        k in desc
-        for k in ("不愿用套", "不要戴", "别戴套", "抵制防护", "别那么多事", "对安全措施抵触")
-    ):
-        if risk >= 0.25:
-            return "refuse_condom"
-    if any(
-        k in desc
-        for k in ("介意无保护", "坚持防护", "全程做好防护", "不急于私密", "注意边界")
-    ):
-        return "refuse_raw"
-
-    h = sum(ord(c) for c in desc) % 100
-    if tier == "low" or risk <= 0.10:
-        if h < 20:
-            return "refuse_raw"
-        if h < 26:
-            return "refuse_condom"
-        return "default"
-    if risk <= 0.30:
-        if h < 28:
-            return "refuse_raw"
-        if h < 52:
-            return "refuse_condom"
-        return "default"
-    if risk <= 0.70:
-        if h < 38:
-            return "refuse_condom"
-        if h < 72:
-            return "refuse_raw"
-        return "default"
-    if h < 55:
-        return "refuse_condom"
-    return "refuse_raw"
-
-
 def build_tier_npc(
     tier: str,
     index: int,
@@ -391,7 +353,7 @@ def build_tier_npc(
         "base_risk": risk,
         "tags": tags,
         "tier": tier,
-        "action_policy": assign_action_policy(tier, risk, tags, desc),
+        "action_policy": policy_from_risk(risk, tags),
     }
 
 
@@ -485,7 +447,7 @@ def main() -> None:
             "base_risk": drisk,
             "tags": d["tags"],
             "tier": "deadly",
-            "action_policy": assign_action_policy("deadly", drisk, d["tags"], desc),
+            "action_policy": policy_from_risk(drisk, d["tags"]),
         })
 
     random.shuffle(npcs)
@@ -516,6 +478,8 @@ def main() -> None:
     assert max(lens) <= MAX_LEN + 1, f"最长 {max(lens)}"
     for n in npcs:
         assert not FORBIDDEN_PLACES.search(n["description"])
+        sync_npc_policy(n)
+        assert n["action_policy"] == policy_from_risk(n["base_risk"], n.get("tags"))
 
     tier_counts = {"low": 0, "active": 0, "high": 0, "deadly": 0}
     for r in risks:
