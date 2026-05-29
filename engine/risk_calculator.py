@@ -5,12 +5,17 @@ from __future__ import annotations
 import random
 from typing import Any, Optional
 
-from config import DISEASE_POOL_BY_DEPTH, TEST_KIT_FALSE_NEGATIVE_CHANCE
+from config import (
+    DISEASE_POOL_BY_DEPTH,
+    INFECTION_RISK_SCALE,
+    TEST_KIT_FALSE_NEGATIVE_CHANCE,
+)
 
 
 def calc_infection_probability(base_risk: float, risk_multiplier: float) -> float:
-    """计算本次行动的感染概率（基础风险 × 系数）。"""
-    return min(1.0, max(0.0, base_risk * risk_multiplier))
+    """计算本次行动的感染概率（基础风险 × 系数 × 全局缩放）。"""
+    raw = base_risk * risk_multiplier * INFECTION_RISK_SCALE
+    return min(1.0, max(0.0, raw))
 
 
 def get_action_infection_probability(action: dict, base_risk: float) -> float:

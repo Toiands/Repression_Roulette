@@ -29,9 +29,12 @@ WIN_TURN_TARGET = 10
 SPAWN_HIGH_RISK_BIAS_AFTER_TURN = 3
 SPAWN_HIGH_RISK_WEIGHT_FACTOR = 2.8
 
+# 感染概率全局缩放（公式：base_risk × 行动系数 × 本项，上限 100%）
+INFECTION_RISK_SCALE = 1.28
+
 # 全程安全保护：无法无脑通关
-CONDOM_BREACH_CHANCE = 0.12  # 有套仍可能疏漏，按更高系数重算感染
-CONDOM_BREACH_RISK_MULTIPLIER = 0.22
+CONDOM_BREACH_CHANCE = 0.18  # 有套仍可能疏漏，按更高系数重算感染
+CONDOM_BREACH_RISK_MULTIPLIER = 0.35
 SAFE_STREAK_LONELINESS_START = 3  # 连续第 N 次选安全保护起算孤独惩罚
 SAFE_STREAK_LONELINESS_BASE = 6
 SAFE_STREAK_LONELINESS_STEP = 4
@@ -83,16 +86,16 @@ ACTIONS = {
         "label": "全程安全保护",
         "description": "相对稳妥，但并非零风险；连续选择会累积孤独",
         "repression_delta": -6,
-        "risk_multiplier": 0.06,
-        "risk_coefficient_label": "6%",
+        "risk_multiplier": 0.09,
+        "risk_coefficient_label": "9%",
         "depth": "shallow",
     },
     "B": {
         "key": "B",
         "label": "无套口角+保护插入",
         "repression_delta": -15,
-        "risk_multiplier": 0.25,
-        "risk_coefficient_label": "25%",
+        "risk_multiplier": 0.38,
+        "risk_coefficient_label": "38%",
         "depth": "shallow",
     },
     "C": {
@@ -124,9 +127,9 @@ TEST_KIT_FALSE_NEGATIVE_CHANCE = 0.28
 
 # 嘉宾基础风险四阶梯（游戏内数值保密）
 RISK_TIERS = {
-    "low": {"count": 65, "min": 0.01, "max": 0.10, "label": "低危泛众"},
-    "active": {"count": 20, "min": 0.15, "max": 0.30, "label": "活跃玩家"},
-    "high": {"count": 12, "min": 0.40, "max": 0.70, "label": "高危盲盒"},
+    "low": {"count": 65, "min": 0.02, "max": 0.14, "label": "低危泛众"},
+    "active": {"count": 20, "min": 0.18, "max": 0.38, "label": "活跃玩家"},
+    "high": {"count": 12, "min": 0.45, "max": 0.78, "label": "高危盲盒"},
     "deadly": {"count": 3, "min": 0.85, "max": 0.95, "label": "致命地雷"},
 }
 

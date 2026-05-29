@@ -397,7 +397,7 @@ def main() -> None:
             build_tier_npc(
                 "low", i, m, LOW_IMP_OPEN[i % len(LOW_IMP_OPEN)],
                 LOW_IMP_CLOSE[(i * 3) % len(LOW_IMP_CLOSE)], det,
-                pick_risk(0.01, 0.10), [], low_names[i],
+                pick_risk(0.02, 0.14), [], low_names[i],
             )
         )
 
@@ -415,7 +415,7 @@ def main() -> None:
             build_tier_npc(
                 "active", i, m, ACT_IMP_OPEN[i % len(ACT_IMP_OPEN)],
                 ACT_IMP_CLOSE[(i * 2) % len(ACT_IMP_CLOSE)], det,
-                pick_risk(0.15, 0.30), tags, act_names[i],
+                pick_risk(0.18, 0.38), tags, act_names[i],
             )
         )
 
@@ -433,7 +433,7 @@ def main() -> None:
             build_tier_npc(
                 "high", i, m, HIGH_IMP_OPEN[i % len(HIGH_IMP_OPEN)],
                 HIGH_IMP_CLOSE[(i * 2) % len(HIGH_IMP_CLOSE)], det,
-                pick_risk(0.40, 0.70), tags, high_names[i],
+                pick_risk(0.45, 0.78), tags, high_names[i],
             )
         )
 
@@ -444,7 +444,7 @@ def main() -> None:
             desc += "你当时觉得她可靠，完全没把违和感当回事。"
         if len(desc) > MAX_LEN:
             desc = desc[: MAX_LEN - 1] + "…"
-        drisk = pick_risk(0.85, 0.95)
+        drisk = pick_risk(0.88, 0.96)
         npcs.append({
             "name": d["name"],
             "description": desc,
@@ -486,11 +486,11 @@ def main() -> None:
 
     tier_counts = {"low": 0, "active": 0, "high": 0, "deadly": 0}
     for r in risks:
-        if r <= 0.10:
+        if r <= 0.14:
             tier_counts["low"] += 1
-        elif r <= 0.30:
+        elif r <= 0.38:
             tier_counts["active"] += 1
-        elif r <= 0.70:
+        elif r <= 0.78:
             tier_counts["high"] += 1
         else:
             tier_counts["deadly"] += 1
