@@ -36,6 +36,8 @@ from ui.theme import (
     render_settlement_box,
     render_stat_bars,
     render_top_header,
+    render_warn_banner,
+    section_title,
 )
 
 st.set_page_config(
@@ -63,8 +65,7 @@ def render_hospital_row() -> None:
     infections = st.session_state.infections
     if not infections:
         return
-    st.markdown('<div class="section-pad">', unsafe_allow_html=True)
-    st.markdown('<p class="section-title">🏥 医院检查</p>', unsafe_allow_html=True)
+    section_title("🏥 医院检查")
     diseases = st.session_state.diseases
     for i, inf in enumerate(infections):
         disease = diseases.get(inf["disease_id"], {})
@@ -80,13 +81,11 @@ def render_hospital_row() -> None:
                 st.rerun()
         else:
             st.caption(f"· {inf['disease_name']}：无法常规治疗")
-    st.markdown("</div>", unsafe_allow_html=True)
 
 
 def render_tool_row() -> None:
     """遭遇前快捷互动：试纸 + 说明。"""
-    st.markdown('<div class="section-pad">', unsafe_allow_html=True)
-    st.markdown('<p class="section-title">遭遇前试探</p>', unsafe_allow_html=True)
+    section_title("遭遇前试探")
     keys = list(INTERACTIONS.keys())
     cols = st.columns(min(len(keys), 3))
     for col, key in zip(cols, keys):
@@ -110,13 +109,10 @@ def render_tool_row() -> None:
                 msg = apply_interaction(key)
                 st.session_state.last_result = msg
                 st.rerun()
-    st.markdown("</div>", unsafe_allow_html=True)
 
 
 def render_action_grid() -> None:
-    st.markdown('<div class="section-pad">', unsafe_allow_html=True)
-    st.markdown('<p class="section-title">亲密抉择</p>', unsafe_allow_html=True)
-    st.markdown('<div class="action-grid-marker"></div>', unsafe_allow_html=True)
+    section_title("亲密抉择")
 
     row1 = st.columns(2)
     for col, key in zip(row1, ["A", "B"]):
@@ -141,8 +137,6 @@ def render_action_grid() -> None:
             ):
                 resolve_action(key)
                 st.rerun()
-
-    st.markdown("</div>", unsafe_allow_html=True)
 
 
 def render_footer_panels() -> None:
@@ -179,16 +173,9 @@ def render_intro_flow() -> None:
 
 def render_between_encounters() -> None:
     if st.session_state.last_result:
-        st.markdown(
-            '<p class="section-title" style="padding:0 1.25rem">上一轮结算</p>',
-            unsafe_allow_html=True,
-        )
+        section_title("上一轮结算")
         render_settlement_box(st.session_state.last_result)
-    st.markdown(
-        '<div class="section-pad"><div class="warn-banner">'
-        "本轮遭遇已结束 · 点击下方继续</div></div>",
-        unsafe_allow_html=True,
-    )
+    render_warn_banner("本轮遭遇已结束 · 点击下方继续")
     if st.button("继续下一遭遇 →", type="primary", use_container_width=True):
         begin_encounter()
         st.rerun()
@@ -232,7 +219,6 @@ def render_active_encounter() -> None:
     render_partner_card(npc)
     render_clue_tags(st.session_state.encounter_clues)
     render_tool_row()
-    st.markdown('<div class="divider-line" style="margin:0 1.25rem"></div>', unsafe_allow_html=True)
     render_action_grid()
     close_glass_card()
     render_footer_panels()
@@ -241,12 +227,7 @@ def render_active_encounter() -> None:
 def render_idle_start() -> None:
     render_top_header(0)
     render_stat_bars(st.session_state.repression, st.session_state.health)
-    st.markdown(
-        '<div class="section-pad"><div class="warn-banner" style="color:#93c5fd;'
-        'border-color:rgba(59,130,246,0.25);background:rgba(30,58,138,0.2)">'
-        "阅读规则后，点击下方开始第一次遭遇</div></div>",
-        unsafe_allow_html=True,
-    )
+    render_warn_banner("阅读规则后，点击下方开始第一次遭遇", tone="info")
     close_glass_card()
     if st.button("开始遭遇", type="primary", use_container_width=True):
         begin_encounter()
