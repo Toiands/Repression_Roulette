@@ -231,12 +231,13 @@ def achievements_new_this_run() -> list[str]:
     return [a for a in st.session_state.achievements_persistent if a not in start]
 
 
-def render_achievements_sidebar() -> None:
+def render_achievements_sidebar(*, compact: bool = False) -> None:
     init_achievement_state()
     unlocked = _persistent_set()
     total = len(ACHIEVEMENTS)
-    st.subheader("成就")
-    st.caption(f"已解锁 {len(unlocked)} / {total}")
+    if not compact:
+        st.subheader("成就")
+    st.caption(f"已解锁 {len(unlocked)} / {total}（同浏览器可保留）")
 
     with st.expander("查看全部成就", expanded=False):
         for aid, meta in ACHIEVEMENTS.items():

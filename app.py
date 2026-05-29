@@ -1,4 +1,4 @@
-"""压抑模拟器 — Streamlit 主入口。"""
+"""压抑模拟器 — Streamlit 主入口（月抛模拟器风格 UI）。"""
 
 import streamlit as st
 
@@ -10,13 +10,13 @@ from config import (
     TREATMENT_REPRESSION_PENALTY,
     WIN_TURN_TARGET,
 )
-from engine.copy import pick_health_edu
-from engine.event_system import apply_interaction, begin_encounter, resolve_action
 from engine.achievements import (
     render_achievements_sidebar,
     render_new_achievements_banner,
     show_achievement_toasts,
 )
+from engine.copy import pick_health_edu
+from engine.event_system import apply_interaction, begin_encounter, resolve_action
 from engine.game_state import (
     check_game_over,
     get_disease_display,
@@ -26,114 +26,69 @@ from engine.game_state import (
     reset_game,
     treat_disease,
 )
+from ui.theme import (
+    action_button_label,
+    close_glass_card,
+    inject_theme,
+    render_clue_tags,
+    render_intro_screen,
+    render_partner_card,
+    render_settlement_box,
+    render_stat_bars,
+    render_top_header,
+)
 
 st.set_page_config(
     page_title="压抑模拟器",
     page_icon="🎭",
-    layout="wide",
+    layout="centered",
+    initial_sidebar_state="collapsed",
 )
 
-st.title("🎭 压抑模拟器")
-st.caption(f"在压抑与健康之间寻找平衡 · 目标：存活 {WIN_TURN_TARGET} 回合")
+
+def _ensure_ui_state() -> None:
+    if "ui_started" not in st.session_state:
+        st.session_state.ui_started = False
 
 
-def render_game_intro() -> None:
-    """开局介绍（未开始遭遇时显示）。"""
-    if st.session_state.turn_count == 0 and not st.session_state.current_npc:
-        with st.expander("游戏介绍与性病防治提示", expanded=True):
-            st.markdown(GAME_INTRO)
+@st.dialog("游戏指南手册")
+def show_help_dialog() -> None:
+    st.markdown(GAME_INTRO)
+    if st.button("知道了", type="primary", use_container_width=True):
+        st.rerun()
 
 
-def render_sidebar() -> None:
-    with st.sidebar:
-        st.header("生存面板")
-
-        rep = st.session_state.repression
-        health = st.session_state.health
-
-        st.subheader("压抑值")
-        st.progress(rep / REPRESSION_MAX)
-        st.write(f"{rep} / {REPRESSION_MAX}")
-        if rep >= 80:
-            st.error("情绪濒临失控！")
-
-        st.subheader("健康值")
-        st.progress(max(0, health) / 100)
-        st.write(f"{health} / 100")
-
-        st.divider()
-        st.subheader("疾病状态")
-        infections = st.session_state.infections
-        if not infections:
-            st.success("暂无感染")
+def render_hospital_row() -> None:
+    """侧边治疗改为卡片内「医院检查」行。"""
+    infections = st.session_state.infections
+    if not infections:
+        return
+    st.markdown('<div class="section-pad">', unsafe_allow_html=True)
+    st.markdown('<p class="section-title">🏥 医院检查</p>', unsafe_allow_html=True)
+    diseases = st.session_state.diseases
+    for i, inf in enumerate(infections):
+        disease = diseases.get(inf["disease_id"], {})
+        if disease.get("curable", True) and not disease.get("instant_game_over", False):
+            if st.button(
+                f"治疗 {inf['disease_name']}（压抑+{TREATMENT_REPRESSION_PENALTY}）",
+                key=f"treat_{i}_{inf['disease_id']}",
+                use_container_width=True,
+                disabled=st.session_state.game_over,
+            ):
+                msg = treat_disease(i)
+                st.session_state.last_result = msg + "\n" + pick_health_edu()
+                st.rerun()
         else:
-            for i, inf in enumerate(infections):
-                st.warning(get_disease_display(inf))
-                diseases = st.session_state.diseases
-                disease = diseases.get(inf["disease_id"], {})
-                if disease.get("curable", True) and not disease.get(
-                    "instant_game_over", False
-                ):
-                    if st.button(
-                        f"治疗 {inf['disease_name']}（压抑+{TREATMENT_REPRESSION_PENALTY}）",
-                        key=f"treat_{i}_{inf['disease_id']}",
-                        disabled=st.session_state.game_over,
-                    ):
-                        msg = treat_disease(i)
-                        st.session_state.last_result = msg + "\n" + pick_health_edu()
-                        st.rerun()
-                else:
-                    st.caption(f"  · {inf['disease_name']}：无法治愈")
-
-        st.divider()
-        turn = st.session_state.turn_count
-        st.caption(f"存活回合：{turn} / {WIN_TURN_TARGET}")
-        st.progress(min(1.0, turn / WIN_TURN_TARGET))
-        met = len(st.session_state.get("met_npc_ids", []))
-        st.caption(f"本局已遇嘉宾：{met} 人")
-
-        st.subheader("历史记录")
-        history = st.session_state.get("history_log", [])
-        if not history:
-            st.caption("暂无记录")
-        else:
-            with st.expander(f"共 {len(history)} 条", expanded=False):
-                for item in history[:30]:
-                    detail = item.get("detail", "")
-                    line = f"**回合 {item['turn']}** · {item['type']} · {item['summary']}"
-                    st.markdown(line)
-                    if detail:
-                        st.caption(
-                            detail[:120] + ("…" if len(detail) > 120 else "")
-                        )
-
-        render_achievements_sidebar()
-
-        if st.button("重新开始", type="secondary"):
-            reset_game()
-            st.rerun()
+            st.caption(f"· {inf['disease_name']}：无法常规治疗")
+    st.markdown("</div>", unsafe_allow_html=True)
 
 
-def render_history_main() -> None:
-    history = st.session_state.get("history_log", [])
-    with st.expander(f"📜 历史记录（{len(history)} 条）", expanded=False):
-        if not history:
-            st.caption("暂无记录，开始遭遇后会自动记录。")
-        else:
-            for item in history[:50]:
-                st.markdown(
-                    f"**回合 {item['turn']}** · `{item['type']}` · {item['summary']}"
-                )
-                if item.get("detail"):
-                    st.caption(item["detail"][:200])
-
-
-def render_interactions() -> None:
-    st.markdown("**遭遇前互动**（每种每轮限 1 次）")
-
+def render_tool_row() -> None:
+    """遭遇前快捷互动：试纸 + 说明。"""
+    st.markdown('<div class="section-pad">', unsafe_allow_html=True)
+    st.markdown('<p class="section-title">遭遇前试探</p>', unsafe_allow_html=True)
     keys = list(INTERACTIONS.keys())
-    cols = st.columns(len(keys))
-
+    cols = st.columns(min(len(keys), 3))
     for col, key in zip(cols, keys):
         cfg = INTERACTIONS[key]
         used = interaction_already_used(key)
@@ -143,8 +98,9 @@ def render_interactions() -> None:
             or st.session_state.game_over
         )
         with col:
-            st.caption(cfg["description"])
-            label = cfg["label"] + (" ✓" if used else "")
+            label = cfg["label"]
+            if used:
+                label += " ✓"
             if st.button(
                 label,
                 key=f"interact_{key}",
@@ -154,27 +110,19 @@ def render_interactions() -> None:
                 msg = apply_interaction(key)
                 st.session_state.last_result = msg
                 st.rerun()
-
-    clues = st.session_state.encounter_clues
-    if clues:
-        with st.expander("本轮已收集线索", expanded=True):
-            for c in clues:
-                st.markdown(f"- {c}")
+    st.markdown("</div>", unsafe_allow_html=True)
 
 
-def render_actions() -> None:
-    st.markdown("---")
-    st.markdown("**亲密抉择**（选一项结束本轮）")
+def render_action_grid() -> None:
+    st.markdown('<div class="section-pad">', unsafe_allow_html=True)
+    st.markdown('<p class="section-title">亲密抉择</p>', unsafe_allow_html=True)
+    st.markdown('<div class="action-grid-marker"></div>', unsafe_allow_html=True)
 
-    cols = st.columns(4)
-    for col, key in zip(cols, ["A", "B", "C", "D"]):
-        act = ACTIONS[key]
+    row1 = st.columns(2)
+    for col, key in zip(row1, ["A", "B"]):
         with col:
-            st.markdown(f"**{key}**")
-            st.caption(act.get("description") or act["label"])
-            st.caption(f"压抑 {act['repression_delta']:+d}")
             if st.button(
-                f"选择 {key}",
+                action_button_label(key),
                 key=f"action_{key}",
                 use_container_width=True,
                 disabled=not st.session_state.awaiting_action,
@@ -182,111 +130,164 @@ def render_actions() -> None:
                 resolve_action(key)
                 st.rerun()
 
+    row2 = st.columns(2)
+    for col, key in zip(row2, ["C", "D"]):
+        with col:
+            if st.button(
+                action_button_label(key),
+                key=f"action_{key}",
+                use_container_width=True,
+                disabled=not st.session_state.awaiting_action,
+            ):
+                resolve_action(key)
+                st.rerun()
 
-def render_last_settlement() -> None:
-    """展示上一轮行动/跑路等结算文案。"""
-    st.subheader("上一轮结算")
+    st.markdown("</div>", unsafe_allow_html=True)
+
+
+def render_footer_panels() -> None:
+    with st.expander("🏆 成就", expanded=False):
+        render_achievements_sidebar(compact=True)
+    with st.expander(f"📋 约会记录（{len(st.session_state.get('history_log', []))}）", expanded=False):
+        history = st.session_state.get("history_log", [])
+        if not history:
+            st.caption("暂无记录")
+        else:
+            for item in history[:40]:
+                st.markdown(
+                    f"**回合 {item['turn']}** · {item['type']} · {item['summary']}"
+                )
+                if item.get("detail"):
+                    st.caption(item["detail"][:160])
+    if st.button("重新开始本局", type="secondary", use_container_width=True):
+        reset_game()
+        st.session_state.ui_started = True
+        st.rerun()
+
+
+def render_intro_flow() -> None:
+    render_intro_screen()
+    c1, c2 = st.columns(2)
+    with c1:
+        if st.button("开始游戏", type="primary", use_container_width=True):
+            st.session_state.ui_started = True
+            st.rerun()
+    with c2:
+        if st.button("📖 游戏帮助", use_container_width=True):
+            show_help_dialog()
+
+
+def render_between_encounters() -> None:
     if st.session_state.last_result:
-        st.markdown(st.session_state.last_result.replace("\n", "\n\n"))
-    else:
-        st.caption("暂无结算，开始遭遇后将显示在这里。")
+        st.markdown(
+            '<p class="section-title" style="padding:0 1.25rem">上一轮结算</p>',
+            unsafe_allow_html=True,
+        )
+        render_settlement_box(st.session_state.last_result)
+    st.markdown(
+        '<div class="section-pad"><div class="warn-banner">'
+        "本轮遭遇已结束 · 点击下方继续</div></div>",
+        unsafe_allow_html=True,
+    )
+    if st.button("继续下一遭遇 →", type="primary", use_container_width=True):
+        begin_encounter()
+        st.rerun()
 
 
 def render_game_over() -> None:
     won = st.session_state.get("game_won", False)
+    render_top_header(st.session_state.turn_count)
+    render_stat_bars(st.session_state.repression, st.session_state.health)
+
+    st.markdown('<div class="section-pad">', unsafe_allow_html=True)
     if won:
         st.success(st.session_state.game_over_reason)
         st.info(
-            f"坚持到第 {WIN_TURN_TARGET} 回合很不容易。现实中请继续保持：固定伴侣沟通、安全套、定期筛查、"
-            "有症状尽早就医——这些习惯比任何一次侥幸都可靠。"
+            f"坚持到第 {WIN_TURN_TARGET} 回合很不容易。请继续保持：固定伴侣沟通、"
+            "安全套、定期筛查、有症状尽早就医。"
         )
     else:
         st.error(f"游戏结束：{st.session_state.game_over_reason}")
-        st.warning(
-            "无论胜负，真实性病感染都会带来身心代价。若你有过高危经历，请到正规医院皮肤性病科"
-            "或疾控中心咨询检测；若已感染，规范治疗可控制多数病情，越早越好。"
-        )
-    col1, col2, col3 = st.columns(3)
-    with col1:
-        st.metric("最终压抑值", st.session_state.repression)
-    with col2:
-        st.metric("最终健康值", st.session_state.health)
-    with col3:
-        st.metric("存活回合", st.session_state.turn_count)
+    close_glass_card()
+
+    if st.session_state.last_result:
+        render_settlement_box(st.session_state.last_result)
+
     render_new_achievements_banner()
-    if st.button("再来一局", type="primary"):
+    render_footer_panels()
+
+    if st.button("再来一局", type="primary", use_container_width=True):
         reset_game()
+        st.session_state.ui_started = True
         st.rerun()
 
 
-def render_encounter() -> None:
-    render_game_intro()
-
+def render_active_encounter() -> None:
     npc = st.session_state.current_npc
-    if not npc:
-        between_encounters = (
-            st.session_state.turn_count > 0 and not st.session_state.game_over
-        )
-        if between_encounters:
-            if st.session_state.last_result:
-                st.markdown("---")
-                render_last_settlement()
-            st.warning("本轮遭遇已结束。点击下方进入下一遭遇。")
-        elif st.session_state.turn_count == 0:
-            st.info("阅读上方介绍后，点击下方开始第一次遭遇。")
+    turn = st.session_state.turn_count
 
-        if st.button(
-            "开始 / 继续遭遇",
-            type="primary",
-            disabled=st.session_state.game_over or st.session_state.get("game_won"),
-        ):
-            begin_encounter()
-            st.rerun()
-        return
+    render_top_header(turn)
+    render_stat_bars(st.session_state.repression, st.session_state.health)
+    render_hospital_row()
+    render_partner_card(npc)
+    render_clue_tags(st.session_state.encounter_clues)
+    render_tool_row()
+    st.markdown('<div class="divider-line" style="margin:0 1.25rem"></div>', unsafe_allow_html=True)
+    render_action_grid()
+    close_glass_card()
+    render_footer_panels()
 
-    tags = npc.get("tags") or []
-    title = f"遭遇：{npc['name']}"
-    if "coser" in tags:
-        title += " 【Coser】"
-    st.subheader(title)
-    st.info(npc["description"])
 
-    render_interactions()
-    render_actions()
-
-    if not st.session_state.awaiting_action:
-        st.markdown("---")
-        if st.button("进入下一遭遇 →", type="primary"):
-            begin_encounter()
-            st.rerun()
+def render_idle_start() -> None:
+    render_top_header(0)
+    render_stat_bars(st.session_state.repression, st.session_state.health)
+    st.markdown(
+        '<div class="section-pad"><div class="warn-banner" style="color:#93c5fd;'
+        'border-color:rgba(59,130,246,0.25);background:rgba(30,58,138,0.2)">'
+        "阅读规则后，点击下方开始第一次遭遇</div></div>",
+        unsafe_allow_html=True,
+    )
+    close_glass_card()
+    if st.button("开始遭遇", type="primary", use_container_width=True):
+        begin_encounter()
+        st.rerun()
+    render_footer_panels()
 
 
 def main() -> None:
+    inject_theme()
+    _ensure_ui_state()
     init_session_state()
     load_game_data()
+
     from engine.game_state import check_victory
 
     check_game_over()
     check_victory()
-
-    render_sidebar()
     show_achievement_toasts()
+
+    if not st.session_state.ui_started:
+        render_intro_flow()
+        return
 
     if st.session_state.game_over:
         render_game_over()
-        st.markdown("---")
-        render_last_settlement()
         return
 
-    render_encounter()
+    npc = st.session_state.current_npc
+    if not npc:
+        if st.session_state.turn_count > 0:
+            render_top_header(st.session_state.turn_count)
+            render_stat_bars(st.session_state.repression, st.session_state.health)
+            render_hospital_row()
+            close_glass_card()
+            render_between_encounters()
+            render_footer_panels()
+        else:
+            render_idle_start()
+        return
 
-    st.markdown("---")
-    render_history_main()
-    # 遭遇进行中：底部保留上一轮结算；遭遇间隔已在上方展示，避免重复
-    if st.session_state.current_npc:
-        render_last_settlement()
-    elif st.session_state.turn_count == 0 and not st.session_state.game_over:
-        render_last_settlement()
+    render_active_encounter()
 
 
 if __name__ == "__main__":
