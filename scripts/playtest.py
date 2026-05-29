@@ -4,6 +4,7 @@ from __future__ import annotations
 
 import sys
 from pathlib import Path
+from typing import Optional
 from unittest.mock import MagicMock
 
 ROOT = Path(__file__).resolve().parents[1]
@@ -31,11 +32,12 @@ sys.modules["streamlit"] = mock_st
 
 from config import (  # noqa: E402
     ACTIONS,
-    MAX_PROBES_BEFORE_FLEE,
     NPC_FLEE_REPRESSION_PENALTY,
+    PROBE_FLEE_MAX,
     PROBING_INTERACTIONS,
     REPRESSION_START,
 )
+from engine.risk_calculator import get_initial_damage  # noqa: E402
 from engine import game_state, event_system  # noqa: E402
 
 
@@ -50,7 +52,7 @@ def setup_fresh_game() -> SessionState:
 def play_round(
     ss: SessionState,
     *,
-    probes: list[str] | None = None,
+    probes: Optional[list[str]] = None,
     action: str = "A",
     label: str = "",
 ) -> dict:
@@ -93,7 +95,7 @@ def main() -> None:
     print("\n=== 试玩 2：追问 3 次触发跑路 ===")
     ss = setup_fresh_game()
     event_system.begin_encounter()
-    probe_keys = list(PROBING_INTERACTIONS)[:MAX_PROBES_BEFORE_FLEE]
+    probe_keys = list(PROBING_INTERACTIONS)[:PROBE_FLEE_MAX]
     for k in probe_keys:
         msg = event_system.apply_interaction(k)
         print(f"  {k}: awaiting={ss.awaiting_action}, rep={ss.repression}")
@@ -130,7 +132,32 @@ def main() -> None:
     if ss.repression != min(100, before + 50):
         issues.append(f"治疗后压抑应为 {before+50}，实际 {ss.repression}")
 
-    print("\n=== 试玩 5：init 缺 history_log 兼容 ===")
+    print("\n=== 试玩 5：感染首击扣血 ===")
+    ss = setup_fresh_game()
+    disease = ss.diseases["syphilis"]
+    initial = get_initial_damage(disease)
+    before = ss.health
+    game_state.apply_health_delta(-initial)
+    ss.infections.append(
+        {
+            "disease_id": "syphilis",
+            "disease_name": "梅毒",
+            "incubation_remaining": 2,
+            "initial_damage": initial,
+            "damage_per_turn": 8,
+            "curable": True,
+            "is_active": False,
+            "initial_damage_applied": True,
+            "source_npc": "测试",
+        }
+    )
+    if ss.health != before - initial:
+        issues.append(f"首击后健康应为 {before - initial}，实际 {ss.health}")
+    logs = game_state.tick_infections()
+    if ss.health != before - initial:
+        issues.append("潜伏期内 tick 不应再次扣首击伤害")
+
+    print("\n=== 试玩 6：init 缺 history_log 兼容 ===")
     ss = SessionState({"initialized": True, "repression": 50, "health": 100})
     mock_st.session_state = ss
     game_state.append_history("测试", "摘要")

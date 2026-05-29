@@ -72,6 +72,7 @@ def init_session_state() -> None:
         "turn_count": 0,
         "history_log": [],
         "met_npc_ids": [],
+        "encounter_roster": [],
         "game_won": False,
         "safe_streak": 0,
     }
@@ -87,6 +88,8 @@ def init_session_state() -> None:
         st.session_state.encounter_clues = []
     if not isinstance(st.session_state.get("met_npc_ids"), list):
         st.session_state.met_npc_ids = []
+    if not isinstance(st.session_state.get("encounter_roster"), list):
+        st.session_state.encounter_roster = []
     if "game_won" not in st.session_state:
         st.session_state.game_won = False
     if "safe_streak" not in st.session_state:
@@ -300,10 +303,11 @@ def treat_disease(index: int) -> str:
 
 def get_disease_display(inf: dict[str, Any]) -> str:
     """格式化单条感染状态用于侧栏展示。"""
+    initial = int(inf.get("initial_damage", 0))
     if inf["is_active"]:
-        status = "爆发中"
+        status = "发作中"
         detail = f"每轮 -{inf['damage_per_turn']} 健康"
     else:
         status = "潜伏中"
-        detail = f"剩余 {inf['incubation_remaining']} 轮潜伏期"
+        detail = f"剩余 {inf['incubation_remaining']} 轮；已首击 -{initial}"
     return f"{inf['disease_name']}（{status}，{detail}）"

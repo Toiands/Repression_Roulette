@@ -17,6 +17,7 @@ from engine.achievements import (
 )
 from engine.copy import pick_health_edu
 from engine.event_system import apply_interaction, begin_encounter, resolve_action
+from engine.npc_policy import action_disabled_hint, is_action_allowed
 from engine.game_state import (
     check_game_over,
     get_disease_display,
@@ -32,6 +33,7 @@ from ui.theme import (
     game_layout,
     inject_theme,
     render_clue_tags,
+    render_encounter_roster,
     render_intro_screen,
     render_partner_card,
     render_settlement_box,
@@ -120,15 +122,19 @@ def render_tool_row() -> None:
 
 def render_action_grid() -> None:
     section_title("亲密抉择")
+    npc = st.session_state.get("current_npc")
+    base_disabled = not st.session_state.awaiting_action
 
     row1 = st.columns(2)
     for col, key in zip(row1, ["A", "B"]):
         with col:
+            policy_disabled = not is_action_allowed(npc, key)
             if st.button(
                 action_button_label(key),
                 key=f"action_{key}",
                 use_container_width=True,
-                disabled=not st.session_state.awaiting_action,
+                disabled=base_disabled or policy_disabled,
+                help=action_disabled_hint(npc, key) if policy_disabled else None,
             ):
                 resolve_action(key)
                 st.rerun()
@@ -136,11 +142,13 @@ def render_action_grid() -> None:
     row2 = st.columns(2)
     for col, key in zip(row2, ["C", "D"]):
         with col:
+            policy_disabled = not is_action_allowed(npc, key)
             if st.button(
                 action_button_label(key),
                 key=f"action_{key}",
                 use_container_width=True,
-                disabled=not st.session_state.awaiting_action,
+                disabled=base_disabled or policy_disabled,
+                help=action_disabled_hint(npc, key) if policy_disabled else None,
             ):
                 resolve_action(key)
                 st.rerun()
@@ -204,6 +212,10 @@ def render_game_over() -> None:
 
     if st.session_state.last_result:
         render_settlement_box(st.session_state.last_result)
+
+    roster = st.session_state.get("encounter_roster", [])
+    with st.expander(f"👥 本局嘉宾回顾（{len(roster)}）", expanded=True):
+        render_encounter_roster(roster)
 
     render_new_achievements_banner()
     render_footer_panels()

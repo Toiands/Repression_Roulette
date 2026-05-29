@@ -2,15 +2,42 @@
 
 基于 Streamlit 的纯文字生存游戏。
 
-## 运行
+## 本地测试（改代码后先跑这个，满意再 push）
 
 ```bash
 cd repression_simulator
+
+# 需要 Python 3.10+（推荐 3.11；你若是 3.9 会报类型注解错误）
+python3 --version
+
+# 首次：建虚拟环境并安装依赖
+python3 -m venv .venv
+source .venv/bin/activate   # Windows: .venv\Scripts\activate
 pip install -r requirements.txt
+
+# 启动（以后每次改完代码都执行）
 streamlit run app.py
 ```
 
-浏览器将自动打开本地页面（默认 `http://localhost:8501`）。
+浏览器打开 `http://localhost:8501`。改 `app.py` / `ui/theme.py` 等后保存，页面会提示 **Rerun**，点一下即可刷新。
+
+**本地满意后再发版：**
+
+```bash
+git add .
+git commit -m "你的说明"
+git push   # Streamlit Cloud 会自动重新部署
+```
+
+`.venv` 已在 `.gitignore` 中，不会提交到 GitHub。
+
+## 运行（简写）
+
+```bash
+cd repression_simulator
+source .venv/bin/activate
+streamlit run app.py
+```
 
 同一 WiFi 内临时分享（跨路由器无效）：
 

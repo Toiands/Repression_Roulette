@@ -26,7 +26,9 @@ from engine.game_state import (
     append_clue,
     append_history,
     after_encounter_resolved,
+    apply_health_delta,
     apply_repression_delta,
+    check_game_over,
     count_probing_interactions,
     get_flee_probe_limit,
     interaction_already_used,
@@ -35,11 +37,14 @@ from engine.game_state import (
     start_new_event_turn,
     trigger_instant_game_over,
 )
+from engine.roster import append_encounter_roster
 from engine.copy import pick_health_edu
+from engine.npc_policy import is_action_allowed
 from engine.risk_calculator import (
     calc_infection_probability,
     create_infection_record,
     get_action_infection_probability,
+    get_initial_damage,
     pick_disease_for_depth,
     roll_infection,
     run_test_kit_reading,
@@ -108,6 +113,10 @@ def trigger_npc_flee(npc_name: str) -> str:
     _end_encounter()
     st.session_state.last_result = result
     append_history("对方跑路", f"{npc_name} 因追问过多离开", result)
+    append_encounter_roster(
+        outcome="fled",
+        summary="追问过多，对方离开",
+    )
     from engine.achievements import record_npc_fled
 
     record_npc_fled()
@@ -225,6 +234,9 @@ def resolve_action(action_key: str) -> str:
         return "当前没有可处理的遭遇。"
 
     npc = st.session_state.current_npc
+    if not is_action_allowed(npc, action_key):
+        return "对方不接受该选项。"
+
     action = ACTIONS[action_key]
     diseases = st.session_state.diseases
 
@@ -266,6 +278,10 @@ def resolve_action(action_key: str) -> str:
         breach = True
         prob = calc_infection_probability(risk, CONDOM_BREACH_RISK_MULTIPLIER)
 
+    roster_outcome = "left" if action_key == "D" else "completed"
+    roster_summary = action["label"]
+    roster_disease = ""
+
     if prob > 0:
         if roll_infection(prob):
             if breach:
@@ -277,6 +293,8 @@ def resolve_action(action_key: str) -> str:
                     from engine.achievements import record_hiv_game_over
 
                     record_hiv_game_over()
+                    roster_outcome = "hiv"
+                    roster_summary = f"{action['label']} · 确诊 HIV"
                     lines.append(
                         "确诊 **HIV**，精神与健康防线瞬间崩溃，游戏立刻结束。"
                     )
@@ -286,15 +304,26 @@ def resolve_action(action_key: str) -> str:
                         )
                     )
                 else:
+                    initial = get_initial_damage(disease)
+                    old_health = st.session_state.health
+                    apply_health_delta(-initial)
                     record = create_infection_record(disease, npc["name"])
                     record["action_label"] = action["label"]
                     record["encounter_turn"] = st.session_state.turn_count
                     add_infection(record)
                     record_infection(disease["id"], npc)
+                    roster_outcome = "infected"
+                    roster_disease = disease["name"]
+                    roster_summary = f"{action['label']} · 感染{disease['name']}"
                     lines.append(
-                        f"你已感染「{disease['name']}」，"
-                        f"潜伏期 {disease['incubation_turns']} 轮（尚未扣血）。"
+                        f"你已感染「{disease['name']}」，身体立刻受到冲击，"
+                        f"健康值 {old_health} → {st.session_state.health}（首击 -{initial}）。"
                     )
+                    if disease["incubation_turns"] > 0:
+                        lines.append(
+                            f"症状仍在潜伏期（剩余 {disease['incubation_turns']} 轮），"
+                            f"发作后每轮还将持续 -{disease['damage_per_turn']} 健康。"
+                        )
                     lines.append(
                         _infection_narrative(
                             disease["id"], npc["name"], action["label"]
@@ -305,13 +334,21 @@ def resolve_action(action_key: str) -> str:
                         f"「{disease['name']}」← {npc['name']}",
                         lines[-1],
                     )
+                    check_game_over()
         # 未感染：不展示判定过程，保持悬念
     elif action_key == "D":
         lines.append("你明确婉拒并直接离场，孤独感加重了压抑。")
+        roster_summary = "婉拒离场"
     # 全程安全保护且未感染：同样不额外提示
 
     lines.append(pick_health_edu())
     result = "\n".join(lines)
+    append_encounter_roster(
+        outcome=roster_outcome,
+        summary=roster_summary,
+        action_label=action["label"],
+        disease_name=roster_disease,
+    )
     _end_encounter()
     st.session_state.last_result = result
     append_history("亲密抉择", f"{action['label']} @ {npc['name']}", result)

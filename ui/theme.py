@@ -5,6 +5,7 @@ from __future__ import annotations
 import html
 import re
 from contextlib import contextmanager
+from typing import Any, Optional
 
 import streamlit as st
 
@@ -37,7 +38,6 @@ def game_layout():
 
 def format_npc_description(desc: str) -> str:
     """把三段介绍拆行显示（不用 span，避免 Streamlit 剥标签露代码）。"""
-    labels = ("相识方式：", "第一印象：", "细节观察：")
     parts = re.split(r"(相识方式：|第一印象：|细节观察：)", desc)
     if len(parts) < 3:
         return f'<p style="margin:0;line-height:1.8;">{_esc(desc)}</p>'
@@ -155,7 +155,7 @@ def close_glass_card() -> None:
     close_card()
 
 
-def npc_avatar(npc: dict | None) -> str:
+def npc_avatar(npc: Optional[dict[str, Any]]) -> str:
     if not npc:
         return "🌚"
     tags = npc.get("tags") or []
@@ -248,13 +248,42 @@ def render_intro_screen() -> None:
             <div style="text-align:left;font-size:15px;color:#cbd5e1;background:rgba(30,41,59,0.5);
                 border:1px solid rgba(255,255,255,0.05);border-radius:1rem;padding:1.5rem 1.35rem;
                 line-height:1.8;">
-                <p>1. <b>延迟判决</b>：高危行为后，你<b>不会</b>立刻知道是否感染。</p>
+                <p>1. <b>感染后果</b>：若感染，<b>当轮即受较大健康冲击</b>，潜伏期结束后仍会持续扣血。</p>
                 <p>2. <b>双条生存</b>：压抑爆表或健康归零都会失败。</p>
                 <p>3. <b>试探取舍</b>：试纸与追问有用，但问太多对方可能离开。</p>
                 <p>4. <b>目标</b>：存活 <b>{WIN_TURN_TARGET}</b> 回合，在欲望与风险间撑住。</p>
             </div>
         </div>
         """,
+        unsafe_allow_html=True,
+    )
+
+
+def render_encounter_roster(roster: list[dict[str, Any]]) -> None:
+    """结局页：本局遇到过的人。"""
+    from engine.roster import OUTCOME_LABELS
+
+    if not roster:
+        st.caption("本局暂无遭遇记录")
+        return
+    rows: list[str] = []
+    for item in roster:
+        turn = item.get("turn", "?")
+        name = _esc(str(item.get("name", "未知")))
+        outcome_key = item.get("outcome", "completed")
+        outcome = _esc(OUTCOME_LABELS.get(outcome_key, outcome_key))
+        summary = _esc(str(item.get("summary", "")))
+        disease = item.get("disease_name") or ""
+        extra = f" · {_esc(disease)}" if disease else ""
+        rows.append(
+            f'<p style="margin:0.35rem 0;font-size:14px;color:#e2e8f0;line-height:1.6;">'
+            f"<b>第 {turn} 回合</b> · {name} · <span style=\"color:#94a3b8;\">{outcome}</span>"
+            f"{extra}<br/><span style=\"color:#cbd5e1;\">{summary}</span></p>"
+        )
+    st.markdown(
+        f'<div style="padding:0 {S_PAD_X} 0.5rem;">'
+        f'<div style="background:rgba(30,41,59,0.45);border:1px solid rgba(255,255,255,0.06);'
+        f'border-radius:1rem;padding:1rem 1.2rem;">{"".join(rows)}</div></div>',
         unsafe_allow_html=True,
     )
 

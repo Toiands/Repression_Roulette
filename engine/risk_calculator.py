@@ -1,7 +1,9 @@
 """感染概率计算与暗骰结算。"""
 
+from __future__ import annotations
+
 import random
-from typing import Any
+from typing import Any, Optional
 
 from config import DISEASE_POOL_BY_DEPTH, TEST_KIT_FALSE_NEGATIVE_CHANCE
 
@@ -65,7 +67,7 @@ def run_test_kit_reading(
 
 def pick_disease_for_depth(
     depth: str, diseases: dict[str, dict[str, Any]]
-) -> dict[str, Any] | None:
+) -> Optional[dict[str, Any]]:
     """根据感染深度从疾病池抽取一种疾病。"""
     pool_ids = DISEASE_POOL_BY_DEPTH.get(depth, [])
     candidates = [diseases[did] for did in pool_ids if did in diseases]
@@ -74,17 +76,31 @@ def pick_disease_for_depth(
     return random.choice(candidates)
 
 
+def get_initial_damage(disease: dict[str, Any]) -> int:
+    """感染当轮首击伤害（单独配置，通常大于每轮持续伤害）。"""
+    if disease.get("instant_game_over"):
+        return 0
+    return int(
+        disease.get(
+            "initial_damage",
+            disease.get("damage_per_turn", 0),
+        )
+    )
+
+
 def create_infection_record(
     disease: dict[str, Any], source_npc_name: str
 ) -> dict[str, Any]:
-    """创建一条潜伏感染记录。"""
+    """创建一条感染记录（潜伏期结束后才进入每轮持续扣血）。"""
     return {
         "disease_id": disease["id"],
         "disease_name": disease["name"],
         "incubation_remaining": disease["incubation_turns"],
+        "initial_damage": get_initial_damage(disease),
         "damage_per_turn": disease["damage_per_turn"],
         "curable": disease.get("curable", True),
         "instant_game_over": disease.get("instant_game_over", False),
         "is_active": False,
+        "initial_damage_applied": True,
         "source_npc": source_npc_name,
     }

@@ -3,6 +3,7 @@
     "id": "syphilis",
     "name": "梅毒",
     "incubation_turns": 3,
+    "initial_damage": 18,
     "damage_per_turn": 8,
     "curable": true,
     "instant_game_over": false
@@ -11,6 +12,7 @@
     "id": "genital_warts",
     "name": "尖锐湿疣",
     "incubation_turns": 2,
+    "initial_damage": 14,
     "damage_per_turn": 6,
     "curable": true,
     "instant_game_over": false
@@ -19,6 +21,7 @@
     "id": "hiv",
     "name": "HIV",
     "incubation_turns": 0,
+    "initial_damage": 0,
     "damage_per_turn": 0,
     "curable": false,
     "instant_game_over": true
