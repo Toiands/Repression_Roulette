@@ -45,7 +45,7 @@ from engine.npc_policy import (
     dialogue_observe,
     dialogue_request_report,
     is_action_allowed,
-    sync_npc_policy,
+    ensure_npc_policy,
 )
 from engine.risk_calculator import (
     calc_infection_probability,
@@ -78,7 +78,7 @@ def spawn_npc() -> dict[str, Any]:
         npc = random.choices(pool, weights=weights, k=1)[0]
     else:
         npc = random.choice(pool)
-    sync_npc_policy(npc)
+    ensure_npc_policy(npc)
     st.session_state.met_npc_ids.append(npc["id"])
     st.session_state.current_npc = npc
     st.session_state.awaiting_action = True

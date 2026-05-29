@@ -14,7 +14,12 @@ ROOT = Path(__file__).resolve().parents[1]
 sys.path.insert(0, str(ROOT))
 OUT = ROOT / "data" / "npcs.json"
 
-from engine.npc_policy import policy_from_risk, sync_npc_policy  # noqa: E402
+from engine.npc_policy import (  # noqa: E402
+    ensure_npc_policy,
+    is_policy_mine,
+    roll_action_policy_for_npc,
+    suggested_policy_from_risk,
+)
 
 MIN_LEN, MAX_LEN = 100, 140
 FORBIDDEN_PLACES = re.compile(
@@ -347,13 +352,17 @@ def build_tier_npc(
 
     imp = imp_o + "，" + imp_c
     desc = compose(meeting, imp, det if det else pad, pad="")
+    policy, is_mine = roll_action_policy_for_npc(risk, tags)
+    out_tags = list(tags)
+    if is_mine and "policy_mine" not in out_tags:
+        out_tags.append("policy_mine")
     return {
         "name": name,
         "description": desc,
         "base_risk": risk,
-        "tags": tags,
+        "tags": out_tags,
         "tier": tier,
-        "action_policy": policy_from_risk(risk, tags),
+        "action_policy": policy,
     }
 
 
@@ -441,13 +450,17 @@ def main() -> None:
         if len(desc) > MAX_LEN:
             desc = desc[: MAX_LEN - 1] + "…"
         drisk = pick_risk(0.85, 0.95)
+        dtags = list(d["tags"])
+        dpolicy, dmine = roll_action_policy_for_npc(drisk, dtags)
+        if dmine and "policy_mine" not in dtags:
+            dtags.append("policy_mine")
         npcs.append({
             "name": d["name"],
             "description": desc,
             "base_risk": drisk,
-            "tags": d["tags"],
+            "tags": dtags,
             "tier": "deadly",
-            "action_policy": policy_from_risk(drisk, d["tags"]),
+            "action_policy": dpolicy,
         })
 
     random.shuffle(npcs)
@@ -478,8 +491,9 @@ def main() -> None:
     assert max(lens) <= MAX_LEN + 1, f"最长 {max(lens)}"
     for n in npcs:
         assert not FORBIDDEN_PLACES.search(n["description"])
-        sync_npc_policy(n)
-        assert n["action_policy"] == policy_from_risk(n["base_risk"], n.get("tags"))
+        ensure_npc_policy(n)
+        if is_policy_mine(n) and "policy_mine" not in n.get("tags", []):
+            n.setdefault("tags", []).append("policy_mine")
 
     tier_counts = {"low": 0, "active": 0, "high": 0, "deadly": 0}
     for r in risks:
@@ -499,7 +513,15 @@ def main() -> None:
     print(f"字数: {min(lens)}-{max(lens)} 平均{sum(lens)/len(lens):.1f}")
     print(f"阶梯计数(按risk): {tier_counts}")
     traps = [n for n in npcs if "trap" in n.get("tags", [])]
+    mines = [n for n in npcs if "policy_mine" in n.get("tags", [])]
     print(f"地雷: {[t['name'] for t in traps]} -> {[t['base_risk'] for t in traps]}")
+    print(f"策略雷 policy_mine: {len(mines)} 人")
+    for n in mines[:5]:
+        sug = suggested_policy_from_risk(n["base_risk"], n.get("tags"))
+        print(
+            f"  · {n['name']} risk={n['base_risk']} "
+            f"suggested={sug} actual={n['action_policy']}"
+        )
 
 
 if __name__ == "__main__":
