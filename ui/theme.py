@@ -155,10 +155,11 @@ def render_partner_card(npc: dict) -> None:
                 background:linear-gradient(135deg,#334155,#1e293b);border:2px solid #475569;
                 display:flex;align-items:center;justify-content:center;font-size:2.25rem;
                 box-shadow:0 10px 25px rgba(0,0,0,0.5);">{npc_avatar(npc)}</div>
-            <h2 style="font-size:1rem;font-weight:700;color:#fff;margin:0 0 0.5rem;">
+            <h2 style="font-size:1.1rem;font-weight:700;color:#fff;margin:0 0 0.75rem;">
                 潜在伴侣 · {name}</h2>
-            <p style="font-size:11px;color:rgba(249,168,212,0.9);font-style:italic;line-height:1.6;
-                margin:0;font-family:Georgia,'Noto Serif SC',serif;">"{desc}"</p>
+            <p style="font-size:15px;color:rgba(253,186,216,0.95);font-style:italic;line-height:1.75;
+                margin:0;padding:0 0.5rem;text-align:left;font-family:Georgia,'Noto Serif SC',serif;">
+                "{desc}"</p>
             <div style="margin-top:0.75rem;">{badges}</div>
         </div>
         """,
@@ -207,9 +208,9 @@ def render_intro_screen() -> None:
             <div style="font-size:1.75rem;font-weight:900;color:#fff;margin-bottom:0.25rem;">压抑模拟器</div>
             <div style="font-size:10px;font-weight:700;color:#64748b;letter-spacing:0.15em;
                 text-transform:uppercase;margin-bottom:1rem;">Survival Edition</div>
-            <div style="text-align:left;font-size:12px;color:#cbd5e1;background:rgba(30,41,59,0.5);
+            <div style="text-align:left;font-size:14px;color:#cbd5e1;background:rgba(30,41,59,0.5);
                 border:1px solid rgba(255,255,255,0.05);border-radius:0.75rem;padding:1.25rem;
-                line-height:1.7;">
+                line-height:1.75;">
                 <p>1. <b>延迟判决</b>：高危行为后，你<b>不会</b>立刻知道是否感染。</p>
                 <p>2. <b>双条生存</b>：压抑爆表或健康归零都会失败。</p>
                 <p>3. <b>试探取舍</b>：试纸与追问有用，但问太多对方可能离开。</p>
@@ -228,7 +229,7 @@ def render_settlement_box(text: str) -> None:
     st.markdown(
         f'<div style="padding:0 1.25rem 1rem;">'
         f'<div style="background:rgba(30,41,59,0.5);border:1px solid rgba(255,255,255,0.06);'
-        f"border-radius:0.75rem;padding:1rem;font-size:13px;line-height:1.65;color:#e2e8f0;"
+        f"border-radius:0.75rem;padding:1rem;font-size:15px;line-height:1.75;color:#e2e8f0;"
         f'white-space:pre-wrap;">{body}</div></div>',
         unsafe_allow_html=True,
     )
